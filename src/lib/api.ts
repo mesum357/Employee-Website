@@ -1,0 +1,154 @@
+import axios from 'axios';
+
+// API Base URL - connects to shared backend
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
+// Create axios instance
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  withCredentials: true,
+});
+
+// Request interceptor - add auth token
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor - handle errors
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Token expired or invalid
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/auth';
+    }
+    return Promise.reject(error);
+  }
+);
+
+// Auth API
+export const authAPI = {
+  login: (email: string, password: string) =>
+    api.post('/auth/login', { email, password }),
+  register: (data: any) =>
+    api.post('/auth/register', data),
+  logout: () =>
+    api.post('/auth/logout'),
+  getMe: () =>
+    api.get('/auth/me'),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    api.put('/auth/change-password', { currentPassword, newPassword }),
+  checkStatus: (email: string) =>
+    api.get(`/auth/check-status/${email}`),
+};
+
+// Employee API (for employees portal)
+export const employeeAPI = {
+  getProfile: () =>
+    api.get('/auth/me'),
+  updateProfile: (id: string, data: any) =>
+    api.put(`/employees/${id}`, data),
+  getDirectory: () =>
+    api.get('/employees/directory'),
+};
+
+// Attendance API
+export const attendanceAPI = {
+  checkIn: () =>
+    api.post('/attendance/check-in'),
+  checkOut: () =>
+    api.post('/attendance/check-out'),
+  getToday: () =>
+    api.get('/attendance/today'),
+  getMy: (month?: number, year?: number) =>
+    api.get('/attendance/my', { params: { month, year } }),
+  getAll: (params?: any) =>
+    api.get('/attendance', { params }),
+};
+
+// Leave API
+export const leaveAPI = {
+  getMy: () =>
+    api.get('/leaves/my'),
+  getBalance: () =>
+    api.get('/leaves/balance'),
+  create: (data: any) =>
+    api.post('/leaves', data),
+  cancel: (id: string) =>
+    api.put(`/leaves/${id}/cancel`),
+  getAll: (params?: any) =>
+    api.get('/leaves', { params }),
+};
+
+// Notice API
+export const noticeAPI = {
+  getAll: (params?: any) =>
+    api.get('/notices', { params }),
+  getRecent: () =>
+    api.get('/notices/recent'),
+  getById: (id: string) =>
+    api.get(`/notices/${id}`),
+  acknowledge: (id: string) =>
+    api.put(`/notices/${id}/acknowledge`),
+};
+
+// Chat API
+export const chatAPI = {
+  getAll: () =>
+    api.get('/chat'),
+  getById: (id: string) =>
+    api.get(`/chat/${id}`),
+  getMessages: (id: string, page?: number) =>
+    api.get(`/chat/${id}/messages`, { params: { page } }),
+  getUsers: () =>
+    api.get('/chat/users'),
+  createPrivate: (userId: string) =>
+    api.post('/chat/private', { userId }),
+  sendMessage: (chatId: string, content: string, messageType?: string) =>
+    api.post(`/chat/${chatId}/message`, { content, messageType }),
+};
+
+// Task API
+export const taskAPI = {
+  getMy: (status?: string) =>
+    api.get('/tasks/my', { params: { status } }),
+  getById: (id: string) =>
+    api.get(`/tasks/${id}`),
+  update: (id: string, data: any) =>
+    api.put(`/tasks/${id}`, data),
+  addComment: (id: string, content: string) =>
+    api.post(`/tasks/${id}/comment`, { content }),
+};
+
+// Report API
+export const reportAPI = {
+  getDashboard: () =>
+    api.get('/reports/dashboard'),
+  getEmployeeReport: (id: string) =>
+    api.get(`/reports/employee/${id}`),
+};
+
+// Settings/Profile API
+export const settingsAPI = {
+  getProfile: () =>
+    api.get('/auth/me'),
+  updateProfile: (id: string, data: any) =>
+    api.put(`/employees/${id}`, data),
+};
+
+export default api;
+
