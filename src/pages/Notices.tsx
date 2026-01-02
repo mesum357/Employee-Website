@@ -35,7 +35,7 @@ interface Notice {
   priority: string;
   targetAudience: string;
   departments?: Array<{ _id: string; name: string }> | string[];
-  publishedBy?: { email: string };
+  publishedBy?: { email: string; role?: string };
   publishedAt: string;
   expiresAt?: string;
   isPinned: boolean;
@@ -246,6 +246,11 @@ const Notices = () => {
               <div className="flex-1 space-y-2">
                 <div className="flex items-center gap-3 flex-wrap">
                   <Badge variant="secondary">{categoryLabels[notice.category] || notice.category}</Badge>
+                  {notice.publishedBy?.role === "boss" || notice.publishedBy?.role === "admin" ? (
+                    <Badge className="bg-primary/10 text-primary border-primary/20">
+                      Boss Notice
+                    </Badge>
+                  ) : null}
                   {notice.priority === "critical" || notice.priority === "high" ? (
                     <Badge className={cn("border", getPriorityColor(notice.priority))}>
                       {notice.priority.charAt(0).toUpperCase() + notice.priority.slice(1)} Priority
