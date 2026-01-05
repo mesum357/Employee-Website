@@ -54,6 +54,19 @@ export const authAPI = {
     api.put('/auth/change-password', { currentPassword, newPassword }),
   checkStatus: (email: string) =>
     api.get(`/auth/check-status/${email}`),
+  // WebAuthn / Fingerprint API
+  webauthnRegisterStart: () =>
+    api.post('/auth/webauthn/register/start'),
+  webauthnRegisterComplete: (deviceName: string, credential: any) =>
+    api.post('/auth/webauthn/register/complete', { deviceName, credential }),
+  webauthnLoginStart: () =>
+    api.post('/auth/webauthn/login/start'),
+  webauthnLoginComplete: (credential: any) =>
+    api.post('/auth/webauthn/login/complete', { credential }),
+  getWebAuthnCredentials: () =>
+    api.get('/auth/webauthn/credentials'),
+  deleteWebAuthnCredential: (credentialId: string) =>
+    api.delete(`/auth/webauthn/credential/${credentialId}`),
 };
 
 // Employee API (for employees portal)
@@ -122,6 +135,18 @@ export const chatAPI = {
     api.post(`/chat/${chatId}/message`, { content, messageType }),
 };
 
+// Message Request API
+export const messageRequestAPI = {
+  getAll: () =>
+    api.get('/message-requests'),
+  create: (to: string, message?: string) =>
+    api.post('/message-requests', { to, message }),
+  accept: (id: string) =>
+    api.put(`/message-requests/${id}/accept`),
+  reject: (id: string) =>
+    api.put(`/message-requests/${id}/reject`),
+};
+
 // Task API
 export const taskAPI = {
   getMy: (status?: string) =>
@@ -132,6 +157,12 @@ export const taskAPI = {
     api.put(`/tasks/${id}`, data),
   addComment: (id: string, content: string) =>
     api.post(`/tasks/${id}/comment`, { content }),
+  uploadImage: (id: string, formData: FormData) =>
+    api.post(`/tasks/${id}/upload`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }),
 };
 
 // Report API

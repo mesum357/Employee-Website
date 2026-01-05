@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { 
   Eye, EyeOff, Mail, Lock, User, Phone, Building, 
-  Briefcase, CheckCircle2, AlertCircle, Loader2, Clock
+  Briefcase, CheckCircle2, AlertCircle, Loader2, Clock,
+  Fingerprint
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -24,7 +25,8 @@ interface Department {
 const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { login } = useAuth();
+  const { login, loginWithFingerprint } = useAuth();
+  const [fingerprintLoading, setFingerprintLoading] = useState(false);
   const [mode, setMode] = useState<AuthMode>("login");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -143,6 +145,37 @@ const Auth = () => {
     }
     
     setIsLoading(false);
+  };
+
+  const handleFingerprintLogin = async () => {
+    setFingerprintLoading(true);
+    
+    try {
+      // Usernameless authentication - no email required
+      const result = await loginWithFingerprint();
+
+      if (result.success) {
+        toast({
+          title: "Welcome back!",
+          description: "Fingerprint login successful",
+        });
+        navigate('/dashboard');
+      } else {
+        toast({
+          title: "Fingerprint Login Failed",
+          description: result.message || "Failed to authenticate with fingerprint",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "An error occurred during fingerprint login",
+        variant: "destructive",
+      });
+    } finally {
+      setFingerprintLoading(false);
+    }
   };
 
   const handleSignup = async (e: React.FormEvent) => {
@@ -477,6 +510,36 @@ const Auth = () => {
                     </>
                   ) : (
                     'Sign In'
+                  )}
+                </Button>
+
+                {/* Fingerprint Login - Usernameless */}
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground">Or</span>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  size="lg"
+                  onClick={handleFingerprintLogin}
+                  disabled={fingerprintLoading || isLoading}
+                >
+                  {fingerprintLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Authenticating...
+                    </>
+                  ) : (
+                    <>
+                      <Fingerprint className="mr-2 h-4 w-4" />
+                      Login with Fingerprint
+                    </>
                   )}
                 </Button>
               </form>

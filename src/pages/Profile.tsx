@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { FingerprintSettings } from "@/components/profile/FingerprintSettings";
 
 interface EmployeeProfile {
   _id: string;
@@ -409,6 +410,7 @@ const Profile = () => {
             <TabsList>
               <TabsTrigger value="about">About</TabsTrigger>
               <TabsTrigger value="documents">Documents</TabsTrigger>
+              <TabsTrigger value="settings">Settings</TabsTrigger>
             </TabsList>
 
             <TabsContent value="about" className="space-y-6">
@@ -637,6 +639,13 @@ const Profile = () => {
                     <p>No documents uploaded yet</p>
                   </div>
                 )}
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="settings">
+              <Card className="dashboard-card">
+                <h3 className="text-h5 text-foreground mb-4">Fingerprint Authentication</h3>
+                <FingerprintSettings />
               </Card>
             </TabsContent>
           </Tabs>

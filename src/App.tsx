@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { TasksPopup } from "@/components/TasksPopup";
 
 // Pages
 import Auth from "./pages/Auth";
@@ -90,6 +91,7 @@ const App = () => (
         <Sonner />
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <AppRoutes />
+          <TasksPopup />
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>

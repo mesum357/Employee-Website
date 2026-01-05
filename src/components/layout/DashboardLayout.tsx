@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useLocation, Navigate } from "react-router-dom";
 import { 
   LayoutDashboard, 
@@ -13,12 +13,15 @@ import {
   ChevronLeft,
   LogOut,
   Megaphone,
-  Loader2
+  Loader2,
+  CheckSquare
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { taskAPI, noticeAPI } from "@/lib/api";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,9 +46,67 @@ const navigation = [
 
 const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const [collapsed, setCollapsed] = useState(false);
+  const [pendingTasksCount, setPendingTasksCount] = useState(0);
+  const [unreadNoticesCount, setUnreadNoticesCount] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout, isAuthenticated, isLoading } = useAuth();
+
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      fetchPendingTasks();
+      fetchUnreadNotices();
+      // Refresh every 30 seconds
+      const interval = setInterval(() => {
+        fetchPendingTasks();
+        fetchUnreadNotices();
+      }, 30000);
+      
+      // Listen for refresh events from notices page
+      const handleRefresh = () => {
+        fetchUnreadNotices();
+      };
+      window.addEventListener('refreshUnreadNotices', handleRefresh);
+      
+      return () => {
+        clearInterval(interval);
+        window.removeEventListener('refreshUnreadNotices', handleRefresh);
+      };
+    }
+  }, [isAuthenticated, user]);
+
+  const fetchPendingTasks = async () => {
+    try {
+      const response = await taskAPI.getMy("pending");
+      const pendingTasks = response.data.data.tasks?.filter(
+        (t: any) => t.status === "pending" || t.status === "in-progress"
+      ) || [];
+      setPendingTasksCount(pendingTasks.length);
+    } catch (error) {
+      // Silently fail - tasks might not be available
+    }
+  };
+
+  const fetchUnreadNotices = async () => {
+    try {
+      const response = await noticeAPI.getAll({ isActive: true });
+      const notices = response.data.data.notices || [];
+      const userId = user?.id;
+      
+      // Count notices that haven't been read by current user
+      const unreadCount = notices.filter((notice: any) => {
+        if (!notice.readBy || notice.readBy.length === 0) return true;
+        return !notice.readBy.some((read: any) => {
+          const readUserId = typeof read.user === 'object' ? read.user._id : read.user;
+          return readUserId?.toString() === userId?.toString();
+        });
+      }).length;
+      
+      setUnreadNoticesCount(unreadCount);
+    } catch (error) {
+      // Silently fail - notices might not be available
+    }
+  };
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -190,9 +251,38 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
           </div>
 
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" className="relative">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="relative"
+              onClick={() => {
+                const event = new CustomEvent('openTasks');
+                window.dispatchEvent(event);
+                fetchPendingTasks(); // Refresh count when opened
+              }}
+            >
+              <CheckSquare className="w-5 h-5" />
+              {pendingTasksCount > 0 && (
+                <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-destructive text-destructive-foreground">
+                  {pendingTasksCount > 9 ? '9+' : pendingTasksCount}
+                </Badge>
+              )}
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="relative"
+              onClick={() => {
+                navigate("/notices");
+                fetchUnreadNotices(); // Refresh count when opened
+              }}
+            >
               <Bell className="w-5 h-5" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full" />
+              {unreadNoticesCount > 0 && (
+                <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-destructive text-destructive-foreground">
+                  {unreadNoticesCount > 9 ? '9+' : unreadNoticesCount}
+                </Badge>
+              )}
             </Button>
             <button 
               onClick={() => navigate("/profile")}

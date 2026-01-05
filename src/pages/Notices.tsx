@@ -22,6 +22,7 @@ import {
   Loader2,
   AlertCircle,
   X,
+  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { noticeAPI } from "@/lib/api";
@@ -65,6 +66,22 @@ const Notices = () => {
 
   useEffect(() => {
     fetchNotices();
+    
+    // Refresh unread count in navbar when notices page is visited
+    const event = new CustomEvent('refreshUnreadNotices');
+    window.dispatchEvent(event);
+  }, []);
+
+  useEffect(() => {
+    // Refresh notices when window regains focus (user might have read notices in another tab)
+    const handleFocus = () => {
+      fetchNotices();
+      const event = new CustomEvent('refreshUnreadNotices');
+      window.dispatchEvent(event);
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
   const fetchNotices = async () => {
@@ -87,12 +104,17 @@ const Notices = () => {
     setIsDetailOpen(true);
 
     // Mark notice as read if not already read
-    try {
-      await noticeAPI.getById(notice._id);
-      // Refresh notices to update read count
-      fetchNotices();
-    } catch (err) {
-      console.error("Error marking notice as read:", err);
+    if (!isNoticeRead(notice)) {
+      try {
+        await noticeAPI.getById(notice._id);
+        // Refresh notices to update read count and status
+        await fetchNotices();
+        // Update selected notice with fresh data
+        const response = await noticeAPI.getById(notice._id);
+        setSelectedNotice(response.data.data.notice);
+      } catch (err) {
+        console.error("Error marking notice as read:", err);
+      }
     }
   };
 
@@ -127,6 +149,34 @@ const Notices = () => {
 
   const getReadCount = (notice: Notice) => {
     return notice.readBy?.length || 0;
+  };
+
+  const isNoticeRead = (notice: Notice) => {
+    if (!user?.id || !notice.readBy || notice.readBy.length === 0) return false;
+    return notice.readBy.some((read: any) => {
+      const readUserId = typeof read.user === 'object' ? read.user._id : read.user;
+      return readUserId?.toString() === user.id.toString();
+    });
+  };
+
+  const handleMarkAsRead = async (noticeId: string) => {
+    try {
+      // Mark as read by fetching the notice (backend automatically marks it as read)
+      const response = await noticeAPI.getById(noticeId);
+      // Refresh notices to update read status
+      await fetchNotices();
+      
+      // Update selected notice with fresh data
+      if (selectedNotice?._id === noticeId) {
+        setSelectedNotice(response.data.data.notice);
+      }
+      
+      // Refresh unread count in navbar
+      const event = new CustomEvent('refreshUnreadNotices');
+      window.dispatchEvent(event);
+    } catch (err: any) {
+      console.error("Error marking notice as read:", err);
+    }
   };
 
   const getDepartmentName = (notice: Notice) => {
@@ -210,41 +260,62 @@ const Notices = () => {
             <span className="text-sm font-medium">Pinned Notices</span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {pinnedNotices.map((notice) => (
-              <div
-                key={notice._id}
-                onClick={() => handleNoticeClick(notice)}
-                className="flex items-center justify-between p-3 rounded-xl bg-card hover:bg-secondary/50 transition-colors cursor-pointer group"
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-foreground truncate group-hover:text-primary transition-colors">
-                    {notice.title}
-                  </p>
-                  <p className="text-caption">
-                    {notice.publishedBy?.email || "Admin"} • {formatDate(notice.publishedAt)}
-                  </p>
+            {pinnedNotices.map((notice) => {
+              const isRead = isNoticeRead(notice);
+              return (
+                <div
+                  key={notice._id}
+                  onClick={() => handleNoticeClick(notice)}
+                  className={cn(
+                    "flex items-center justify-between p-3 rounded-xl bg-card hover:bg-secondary/50 transition-colors cursor-pointer group",
+                    !isRead && "border border-primary/30 bg-primary/5"
+                  )}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="font-medium text-foreground truncate group-hover:text-primary transition-colors">
+                        {notice.title}
+                      </p>
+                      {!isRead && (
+                        <Badge className="bg-primary text-primary-foreground text-xs h-4 px-1.5">
+                          New
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-caption">
+                      {notice.publishedBy?.email || "Admin"} • {formatDate(notice.publishedAt)}
+                    </p>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
                 </div>
-                <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
-              </div>
-            ))}
+              );
+            })}
           </div>
         </Card>
       )}
 
       {/* Notice Feed */}
       <div className="space-y-4">
-        {sortedNotices.map((notice, index) => (
-          <Card
-            key={notice._id}
-            onClick={() => handleNoticeClick(notice)}
-            className={cn(
-              "dashboard-card cursor-pointer group animate-fade-up",
-              `delay-${(index + 1) * 100}`
-            )}
-          >
+        {sortedNotices.map((notice, index) => {
+          const isRead = isNoticeRead(notice);
+          return (
+            <Card
+              key={notice._id}
+              onClick={() => handleNoticeClick(notice)}
+              className={cn(
+                "dashboard-card cursor-pointer group animate-fade-up",
+                `delay-${(index + 1) * 100}`,
+                !isRead && "border-primary/20 bg-primary/5"
+              )}
+            >
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1 space-y-2">
                 <div className="flex items-center gap-3 flex-wrap">
+                  {!isRead && (
+                    <Badge className="bg-primary text-primary-foreground">
+                      New
+                    </Badge>
+                  )}
                   <Badge variant="secondary">{categoryLabels[notice.category] || notice.category}</Badge>
                   {notice.publishedBy?.role === "boss" || notice.publishedBy?.role === "admin" ? (
                     <Badge className="bg-primary/10 text-primary border-primary/20">
@@ -291,7 +362,8 @@ const Notices = () => {
               <ChevronRight className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
             </div>
           </Card>
-        ))}
+          );
+        })}
       </div>
 
       {filteredNotices.length === 0 && (
@@ -344,21 +416,39 @@ const Notices = () => {
           </DialogHeader>
           {selectedNotice && (
             <div className="mt-4 space-y-4">
-              <div className="flex items-center gap-2 flex-wrap">
-                <Badge variant="secondary">
-                  {categoryLabels[selectedNotice.category] || selectedNotice.category}
-                </Badge>
-                {selectedNotice.priority && (
-                  <Badge className={cn("border", getPriorityColor(selectedNotice.priority))}>
-                    {selectedNotice.priority.charAt(0).toUpperCase() + selectedNotice.priority.slice(1)}{" "}
-                    Priority
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="secondary">
+                    {categoryLabels[selectedNotice.category] || selectedNotice.category}
                   </Badge>
-                )}
-                {selectedNotice.isPinned && (
-                  <Badge variant="outline" className="text-warning border-warning">
-                    <Pin className="w-3 h-3 mr-1" />
-                    Pinned
-                  </Badge>
+                  {selectedNotice.priority && (
+                    <Badge className={cn("border", getPriorityColor(selectedNotice.priority))}>
+                      {selectedNotice.priority.charAt(0).toUpperCase() + selectedNotice.priority.slice(1)}{" "}
+                      Priority
+                    </Badge>
+                  )}
+                  {selectedNotice.isPinned && (
+                    <Badge variant="outline" className="text-warning border-warning">
+                      <Pin className="w-3 h-3 mr-1" />
+                      Pinned
+                    </Badge>
+                  )}
+                  {isNoticeRead(selectedNotice) && (
+                    <Badge variant="outline" className="text-success border-success">
+                      <Check className="w-3 h-3 mr-1" />
+                      Read
+                    </Badge>
+                  )}
+                </div>
+                {!isNoticeRead(selectedNotice) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleMarkAsRead(selectedNotice._id)}
+                  >
+                    <Check className="w-4 h-4 mr-2" />
+                    Mark as Read
+                  </Button>
                 )}
               </div>
               <div className="prose max-w-none">

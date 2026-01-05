@@ -29,6 +29,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; message?: string; code?: string }>;
+  loginWithFingerprint: () => Promise<{ success: boolean; message?: string; code?: string }>;
   logout: () => void;
   checkAuth: () => Promise<void>;
 }
@@ -99,6 +100,46 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const loginWithFingerprint = async (): Promise<{ success: boolean; message?: string; code?: string }> => {
+    try {
+      // Step 1: Start authentication (no email needed for usernameless)
+      const startResponse = await authAPI.webauthnLoginStart();
+      const options = startResponse.data.data;
+
+      // Step 2: Use browser API to authenticate  
+      const { startAuthentication } = await import('@simplewebauthn/browser');
+      // SimpleWebAuthn v13+ - pass options wrapped
+      const credential = await startAuthentication({ optionsJSON: options });
+
+      // Step 3: Complete authentication (no email needed - user found by credential ID)
+      const completeResponse = await authAPI.webauthnLoginComplete(credential);
+      
+      if (completeResponse.data.success) {
+        const { token: newToken, user: userData } = completeResponse.data.data;
+        
+        localStorage.setItem('token', newToken);
+        localStorage.setItem('user', JSON.stringify(userData));
+        
+        setToken(newToken);
+        setUser(userData);
+        
+        return { success: true };
+      } else {
+        return { success: false, message: 'Fingerprint authentication failed' };
+      }
+    } catch (error: any) {
+      let message = 'Fingerprint login failed';
+      
+      if (error.name === 'NotAllowedError') {
+        message = 'Fingerprint authentication was cancelled';
+      } else if (error.response?.data?.message) {
+        message = error.response.data.message;
+      }
+      
+      return { success: false, message };
+    }
+  };
+
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -113,6 +154,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       isAuthenticated,
       isLoading,
       login,
+      loginWithFingerprint,
       logout,
       checkAuth,
     }}>

@@ -21,7 +21,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { chatAPI } from "@/lib/api";
+import { chatAPI, messageRequestAPI } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { io, Socket } from "socket.io-client";
 
@@ -182,20 +182,50 @@ const Chat = () => {
   const handleSelectUser = async (selectedUser: ChatUser) => {
     try {
       setLoading(true);
+      setError(null);
       
-      // Create or get existing private chat
-      const response = await chatAPI.createPrivate(selectedUser._id);
-      const chat = response.data.data.chat;
+      // Check if user is employee and trying to message boss
+      if (user?.role === 'employee' && selectedUser.role === 'boss') {
+        // Create message request instead of direct chat
+        try {
+          const response = await messageRequestAPI.create(selectedUser._id);
+          
+          // If chat was created (request was already accepted), load it
+          if (response.data.data.chat) {
+            const chat = response.data.data.chat;
+            const messagesRes = await chatAPI.getById(chat._id);
+            const chatWithMessages = messagesRes.data.data.chat;
+            setSelectedChat(chatWithMessages);
+            setMessages(chatWithMessages.messages?.filter((m: Message) => !m.isDeleted) || []);
+            fetchChats();
+          } else {
+            // Request is pending
+            setError('Message request sent. Waiting for boss to accept...');
+            // Refresh to show pending status
+            fetchChats();
+          }
+        } catch (err: any) {
+          if (err.response?.status === 400 && err.response?.data?.message?.includes('already pending')) {
+            setError('Message request already pending. Waiting for boss to accept...');
+          } else {
+            throw err;
+          }
+        }
+      } else {
+        // Create or get existing private chat (normal flow)
+        const response = await chatAPI.createPrivate(selectedUser._id);
+        const chat = response.data.data.chat;
 
-      // Fetch messages for this chat
-      const messagesRes = await chatAPI.getById(chat._id);
-      const chatWithMessages = messagesRes.data.data.chat;
+        // Fetch messages for this chat
+        const messagesRes = await chatAPI.getById(chat._id);
+        const chatWithMessages = messagesRes.data.data.chat;
 
-      setSelectedChat(chatWithMessages);
-      setMessages(chatWithMessages.messages?.filter((m: Message) => !m.isDeleted) || []);
-      
-      // Refresh chats list
-      fetchChats();
+        setSelectedChat(chatWithMessages);
+        setMessages(chatWithMessages.messages?.filter((m: Message) => !m.isDeleted) || []);
+        
+        // Refresh chats list
+        fetchChats();
+      }
     } catch (err: any) {
       console.error('Error creating/loading chat:', err);
       setError(err.response?.data?.message || 'Failed to load chat');

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Clock, 
   Calendar, 
@@ -13,7 +13,8 @@ import {
   Plus,
   Copy,
   Check,
-  ArrowRightLeft
+  Loader2,
+  CheckSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,71 +28,28 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { attendanceAPI, noticeAPI, taskAPI } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 
-const kpiCards = [
-  {
-    title: "Today's Status",
-    value: "Clocked In",
-    subtitle: "Since 9:00 AM",
-    icon: Clock,
-    color: "text-success",
-    bgColor: "bg-success-light",
-  },
-  {
-    title: "Total Transfer",
-    value: "$45,230",
-    subtitle: "This month",
-    icon: ArrowRightLeft,
-    color: "text-primary",
-    bgColor: "bg-primary-light",
-  },
-  {
-    title: "Total Sale",
-    value: "$128,450",
-    subtitle: "12 deals closed",
-    icon: DollarSign,
-    color: "text-warning",
-    bgColor: "bg-warning-light",
-  },
-  {
-    title: "This Month",
-    value: "98%",
-    subtitle: "Attendance rate",
-    icon: TrendingUp,
-    color: "text-accent",
-    bgColor: "bg-accent-light",
-  },
-];
+interface Notice {
+  _id: string;
+  title: string;
+  content: string;
+  category: string;
+  isPinned: boolean;
+  createdAt: string;
+  createdBy?: {
+    email: string;
+  };
+}
 
-const recentNotices = [
-  {
-    title: "Office Closure Notice",
-    author: "HR Department",
-    date: "Today",
-    excerpt: "The office will be closed on December 25th for Christmas holidays...",
-    pinned: true,
-  },
-  {
-    title: "New Health Benefits Update",
-    author: "HR Department",
-    date: "Yesterday",
-    excerpt: "We're excited to announce new health benefits starting January 2024...",
-    pinned: false,
-  },
-  {
-    title: "Q4 Town Hall Meeting",
-    author: "Management",
-    date: "2 days ago",
-    excerpt: "Join us for the quarterly town hall meeting to discuss company updates...",
-    pinned: false,
-  },
-];
-
-const upcomingEvents = [
-  { date: "Dec 10", event: "Team Meeting", time: "10:00 AM" },
-  { date: "Dec 12", event: "Project Deadline", time: "5:00 PM" },
-  { date: "Dec 15", event: "Holiday Party", time: "6:00 PM" },
-];
+interface Task {
+  _id: string;
+  title: string;
+  dueDate: string;
+  priority: string;
+}
 
 const ticketCategories = [
   "IT Support",
@@ -118,7 +76,17 @@ const existingTickets = [
 ];
 
 const Dashboard = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("overview");
+  const [loading, setLoading] = useState(true);
+  
+  // Dashboard data
+  const [todayStatus, setTodayStatus] = useState("Not Clocked In");
+  const [clockInTime, setClockInTime] = useState("");
+  const [monthlyAttendanceRate, setMonthlyAttendanceRate] = useState(0);
+  const [recentNotices, setRecentNotices] = useState<Notice[]>([]);
+  const [upcomingTasks, setUpcomingTasks] = useState<Task[]>([]);
   
   // Ticket form state
   const [ticketSubject, setTicketSubject] = useState("");
@@ -132,6 +100,110 @@ const Dashboard = () => {
   const [priceValue, setPriceValue] = useState("");
   const [generatedEmail, setGeneratedEmail] = useState("");
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch today's attendance
+      const todayRes = await attendanceAPI.getToday();
+      const todayData = todayRes.data.data;
+      
+      if (todayData.isCheckedIn) {
+        const checkInTime = new Date(todayData.attendance?.checkIn?.time || new Date());
+        setTodayStatus("Clocked In");
+        setClockInTime(checkInTime.toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        }));
+      } else {
+        setTodayStatus("Not Clocked In");
+        setClockInTime("");
+      }
+
+      // Fetch monthly attendance rate
+      const now = new Date();
+      const month = now.getMonth() + 1;
+      const year = now.getFullYear();
+      const monthlyRes = await attendanceAPI.getMy(month, year);
+      const monthlyData = monthlyRes.data.data;
+      
+      if (monthlyData.summary) {
+        const total = monthlyData.summary.present + monthlyData.summary.absent + 
+                     monthlyData.summary.late + monthlyData.summary.onLeave;
+        const present = monthlyData.summary.present + monthlyData.summary.late;
+        const rate = total > 0 ? Math.round((present / total) * 100) : 0;
+        setMonthlyAttendanceRate(rate);
+      }
+
+      // Fetch recent notices
+      const noticesRes = await noticeAPI.getRecent();
+      const notices = noticesRes.data.data.notices || [];
+      setRecentNotices(notices.slice(0, 3));
+
+      // Fetch upcoming tasks (due in next 7 days)
+      const tasksRes = await taskAPI.getMy();
+      const tasks = tasksRes.data.data.tasks || [];
+      const nextWeek = new Date();
+      nextWeek.setDate(nextWeek.getDate() + 7);
+      const upcoming = tasks
+        .filter((task: Task) => {
+          const dueDate = new Date(task.dueDate);
+          return dueDate >= new Date() && dueDate <= nextWeek && 
+                 task.status !== 'completed' && task.status !== 'cancelled';
+        })
+        .sort((a: Task, b: Task) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+        .slice(0, 3);
+      setUpcomingTasks(upcoming);
+
+    } catch (error: any) {
+      console.error("Error fetching dashboard data:", error);
+      toast.error("Failed to load dashboard data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  const formatRelativeDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return "Today";
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays < 7) return `${diffDays} days ago`;
+    return formatDate(dateString);
+  };
+
+  const kpiCards = [
+    {
+      title: "Today's Status",
+      value: todayStatus,
+      subtitle: clockInTime ? `Since ${clockInTime}` : "Not checked in yet",
+      icon: Clock,
+      color: todayStatus === "Clocked In" ? "text-success" : "text-muted-foreground",
+      bgColor: todayStatus === "Clocked In" ? "bg-success-light" : "bg-muted/20",
+    },
+    {
+      title: "This Month",
+      value: `${monthlyAttendanceRate}%`,
+      subtitle: "Attendance rate",
+      icon: TrendingUp,
+      color: "text-accent",
+      bgColor: "bg-accent-light",
+    },
+  ];
 
   const handleCreateTicket = () => {
     if (!ticketSubject || !ticketCategory || !ticketPriority || !ticketDescription) {
@@ -204,22 +276,38 @@ MMH Corporate
     }
   };
 
+  const userName = user?.employee 
+    ? `${user.employee.firstName} ${user.employee.lastName}`
+    : user?.email || "User";
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-h2 text-foreground">Good Morning, John!</h1>
+            <h1 className="text-h2 text-foreground">Good Morning, {userName.split(' ')[0]}!</h1>
             <p className="text-muted-foreground mt-1">Here's what's happening today.</p>
           </div>
-          <Button size="lg" className="shadow-glow">
+          <Button 
+            size="lg" 
+            className="shadow-glow"
+            onClick={() => navigate("/attendance")}
+          >
             <Clock className="w-5 h-5 mr-2" />
-            Quick Clock Out
+            {todayStatus === "Clocked In" ? "Quick Clock Out" : "Clock In"}
           </Button>
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {kpiCards.map((card, index) => (
             <div 
               key={card.title} 
@@ -275,34 +363,46 @@ MMH Corporate
                   </Button>
                 </div>
                 <div className="space-y-4">
-                  {recentNotices.map((notice) => (
-                    <div 
-                      key={notice.title}
-                      className="p-4 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors cursor-pointer group"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-medium text-foreground group-hover:text-primary transition-colors">
-                              {notice.title}
-                            </h4>
-                            {notice.pinned && (
-                              <span className="px-2 py-0.5 text-xs font-medium bg-primary/10 text-primary rounded-full">
-                                Pinned
-                              </span>
-                            )}
+                  {recentNotices.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Megaphone className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                      <p>No notices available</p>
+                    </div>
+                  ) : (
+                    recentNotices.map((notice) => (
+                      <div 
+                        key={notice._id}
+                        className="p-4 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors cursor-pointer group"
+                        onClick={() => navigate("/notices")}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-medium text-foreground group-hover:text-primary transition-colors">
+                                {notice.title}
+                              </h4>
+                              {notice.isPinned && (
+                                <span className="px-2 py-0.5 text-xs font-medium bg-primary/10 text-primary rounded-full">
+                                  Pinned
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                              {notice.content || "No content"}
+                            </p>
                           </div>
-                          <p className="text-sm text-muted-foreground mt-1 line-clamp-1">
-                            {notice.excerpt}
-                          </p>
-                        </div>
-                        <div className="text-right flex-shrink-0">
-                          <p className="text-xs text-muted-foreground">{notice.date}</p>
-                          <p className="text-xs text-muted-foreground/70 mt-1">{notice.author}</p>
+                          <div className="text-right flex-shrink-0">
+                            <p className="text-xs text-muted-foreground">
+                              {formatRelativeDate(notice.createdAt)}
+                            </p>
+                            <p className="text-xs text-muted-foreground/70 mt-1">
+                              {notice.createdBy?.email?.split('@')[0] || "System"}
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
 
@@ -315,21 +415,42 @@ MMH Corporate
                   <h3 className="text-h4 text-foreground">Upcoming Events</h3>
                 </div>
                 <div className="space-y-4">
-                  {upcomingEvents.map((event) => (
-                    <div 
-                      key={event.event}
-                      className="flex items-center gap-4 p-3 rounded-xl hover:bg-secondary/50 transition-colors"
-                    >
-                      <div className="w-14 h-14 rounded-xl bg-primary-light flex flex-col items-center justify-center flex-shrink-0">
-                        <span className="text-xs text-primary font-medium">{event.date.split(' ')[0]}</span>
-                        <span className="text-lg font-bold text-primary">{event.date.split(' ')[1]}</span>
-                      </div>
-                      <div>
-                        <p className="font-medium text-foreground">{event.event}</p>
-                        <p className="text-sm text-muted-foreground">{event.time}</p>
-                      </div>
+                  {upcomingTasks.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Calendar className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                      <p>No upcoming tasks</p>
                     </div>
-                  ))}
+                  ) : (
+                    upcomingTasks.map((task) => {
+                      const dueDate = new Date(task.dueDate);
+                      const dateStr = formatDate(task.dueDate);
+                      const timeStr = dueDate.toLocaleTimeString('en-US', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: true
+                      });
+                      
+                      return (
+                        <div 
+                          key={task._id}
+                          className="flex items-center gap-4 p-3 rounded-xl hover:bg-secondary/50 transition-colors cursor-pointer"
+                          onClick={() => {
+                            const event = new CustomEvent('openTasks');
+                            window.dispatchEvent(event);
+                          }}
+                        >
+                          <div className="w-14 h-14 rounded-xl bg-primary-light flex flex-col items-center justify-center flex-shrink-0">
+                            <span className="text-xs text-primary font-medium">{dateStr.split(' ')[0]}</span>
+                            <span className="text-lg font-bold text-primary">{dateStr.split(' ')[1]}</span>
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-medium text-foreground">{task.title}</p>
+                            <p className="text-sm text-muted-foreground">Due: {dateStr} at {timeStr}</p>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </div>
             </div>
@@ -338,21 +459,27 @@ MMH Corporate
             <div className="dashboard-card mt-6">
               <h3 className="text-h4 text-foreground mb-4">Quick Actions</h3>
               <div className="flex flex-wrap gap-3">
-                <Button variant="outline">
+                <Button variant="outline" onClick={() => navigate("/leave")}>
                   <Calendar className="w-4 h-4 mr-2" />
                   Request Leave
                 </Button>
-                <Button variant="outline">
+                <Button variant="outline" onClick={() => navigate("/attendance")}>
                   <Clock className="w-4 h-4 mr-2" />
                   View Attendance
                 </Button>
-                <Button variant="outline">
+                <Button variant="outline" onClick={() => navigate("/directory")}>
                   <Users className="w-4 h-4 mr-2" />
                   Team Directory
                 </Button>
-                <Button variant="outline" onClick={() => setActiveTab("tickets")}>
-                  <Ticket className="w-4 h-4 mr-2" />
-                  Create Ticket
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    const event = new CustomEvent('openTasks');
+                    window.dispatchEvent(event);
+                  }}
+                >
+                  <CheckSquare className="w-4 h-4 mr-2" />
+                  My Tasks
                 </Button>
               </div>
             </div>
