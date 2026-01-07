@@ -467,10 +467,6 @@ MMH Corporate
                   <Clock className="w-4 h-4 mr-2" />
                   View Attendance
                 </Button>
-                <Button variant="outline" onClick={() => navigate("/directory")}>
-                  <Users className="w-4 h-4 mr-2" />
-                  Team Directory
-                </Button>
                 <Button 
                   variant="outline" 
                   onClick={() => {

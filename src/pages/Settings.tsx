@@ -72,7 +72,6 @@ const permissionMatrix = [
   { feature: "View Reports", admin: true, hr: true, manager: true, employee: false },
   { feature: "Edit Settings", admin: true, hr: false, manager: false, employee: false },
   { feature: "Manage Roles", admin: true, hr: false, manager: false, employee: false },
-  { feature: "View Directory", admin: true, hr: true, manager: true, employee: true },
   { feature: "Send Notices", admin: true, hr: true, manager: true, employee: false },
 ];
 
