@@ -85,6 +85,10 @@ export const attendanceAPI = {
     api.post('/attendance/check-in'),
   checkOut: () =>
     api.post('/attendance/check-out'),
+  startBreak: (reason: string) =>
+    api.post('/attendance/break/start', { reason }),
+  endBreak: () =>
+    api.post('/attendance/break/end'),
   getToday: () =>
     api.get('/attendance/today'),
   getMy: (month?: number, year?: number) =>

@@ -8,12 +8,30 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Pause,
+  Coffee,
+  UtensilsCrossed,
+  Cigarette
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { attendanceAPI } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
+
+interface Break {
+  startTime: string;
+  endTime?: string;
+  duration?: number;
+  reason: string;
+}
 
 interface AttendanceRecord {
   _id: string;
@@ -28,12 +46,15 @@ interface AttendanceRecord {
   };
   status: string;
   workingHours?: number;
+  breaks?: Break[];
 }
 
 interface TodayStatus {
   attendance: AttendanceRecord | null;
   isCheckedIn: boolean;
   isCheckedOut: boolean;
+  isOnBreak?: boolean;
+  activeBreak?: Break | null;
 }
 
 const Attendance = () => {
@@ -49,6 +70,9 @@ const Attendance = () => {
   const [clockInTime, setClockInTime] = useState<string | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [monthlyAttendance, setMonthlyAttendance] = useState<AttendanceRecord[]>([]);
+  const [isOnBreak, setIsOnBreak] = useState(false);
+  const [activeBreak, setActiveBreak] = useState<Break | null>(null);
+  const [breakStartTime, setBreakStartTime] = useState<Date | null>(null);
 
   // Update current time every second
   useEffect(() => {
@@ -73,6 +97,26 @@ const Attendance = () => {
       setIsClockedIn(todayData.isCheckedIn);
       setIsClockedOut(todayData.isCheckedOut);
       setTodayAttendance(todayData.attendance);
+      
+      // Check for active break from API response
+      if (todayData.isOnBreak && todayData.activeBreak) {
+        setIsOnBreak(true);
+        setActiveBreak(todayData.activeBreak);
+        setBreakStartTime(new Date(todayData.activeBreak.startTime));
+      } else {
+        // Fallback: check breaks array if API doesn't provide isOnBreak
+        const breaks = todayData.attendance?.breaks || [];
+        const activeBreakData = breaks.find((b: Break) => !b.endTime);
+        if (activeBreakData) {
+          setIsOnBreak(true);
+          setActiveBreak(activeBreakData);
+          setBreakStartTime(new Date(activeBreakData.startTime));
+        } else {
+          setIsOnBreak(false);
+          setActiveBreak(null);
+          setBreakStartTime(null);
+        }
+      }
       
       if (todayData.attendance?.checkIn?.time) {
         setClockInTime(new Date(todayData.attendance.checkIn.time).toLocaleTimeString('en-US', {
@@ -130,10 +174,17 @@ const Attendance = () => {
       setActionLoading(true);
       setError(null);
       
+      // End break if active before clocking out
+      if (isOnBreak) {
+        await attendanceAPI.endBreak();
+      }
+      
       const response = await attendanceAPI.checkOut();
       
       if (response.data.success) {
         setIsClockedOut(true);
+        setIsOnBreak(false);
+        setActiveBreak(null);
         setTodayAttendance(response.data.data.attendance);
         // Refresh data
         fetchAttendanceData();
@@ -141,6 +192,54 @@ const Attendance = () => {
     } catch (err: any) {
       console.error('Clock out error:', err);
       setError(err.response?.data?.message || 'Failed to clock out');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleStartBreak = async (reason: string) => {
+    try {
+      setActionLoading(true);
+      setError(null);
+      
+      const response = await attendanceAPI.startBreak(reason);
+      
+      if (response.data.success) {
+        setIsOnBreak(true);
+        setActiveBreak(response.data.data.activeBreak);
+        setBreakStartTime(new Date());
+        setTodayAttendance(response.data.data.attendance);
+        toast.success('Break started');
+        fetchAttendanceData();
+      }
+    } catch (err: any) {
+      console.error('Start break error:', err);
+      setError(err.response?.data?.message || 'Failed to start break');
+      toast.error(err.response?.data?.message || 'Failed to start break');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleEndBreak = async () => {
+    try {
+      setActionLoading(true);
+      setError(null);
+      
+      const response = await attendanceAPI.endBreak();
+      
+      if (response.data.success) {
+        setIsOnBreak(false);
+        setActiveBreak(null);
+        setBreakStartTime(null);
+        setTodayAttendance(response.data.data.attendance);
+        toast.success('Break ended');
+        fetchAttendanceData();
+      }
+    } catch (err: any) {
+      console.error('End break error:', err);
+      setError(err.response?.data?.message || 'Failed to end break');
+      toast.error(err.response?.data?.message || 'Failed to end break');
     } finally {
       setActionLoading(false);
     }
@@ -215,7 +314,7 @@ const Attendance = () => {
     );
   };
 
-  // Calculate worked time since clock in
+  // Calculate worked time since clock in (excluding breaks)
   const getWorkedTime = () => {
     if (!todayAttendance?.checkIn?.time) return null;
     
@@ -224,11 +323,43 @@ const Attendance = () => {
       ? new Date(todayAttendance.checkOut.time) 
       : new Date();
     
-    const diffMs = endTime.getTime() - checkInTime.getTime();
+    let totalBreakMs = 0;
+    
+    // Calculate total break time
+    if (todayAttendance.breaks && todayAttendance.breaks.length > 0) {
+      todayAttendance.breaks.forEach((breakItem: Break) => {
+        if (breakItem.endTime) {
+          // Completed break
+          const breakStart = new Date(breakItem.startTime);
+          const breakEnd = new Date(breakItem.endTime);
+          totalBreakMs += breakEnd.getTime() - breakStart.getTime();
+        } else if (isOnBreak && breakStartTime) {
+          // Active break
+          totalBreakMs += new Date().getTime() - breakStartTime.getTime();
+        }
+      });
+    }
+    
+    const diffMs = endTime.getTime() - checkInTime.getTime() - totalBreakMs;
     const hours = Math.floor(diffMs / (1000 * 60 * 60));
     const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
     
     return `${hours}h ${minutes}m`;
+  };
+
+  // Calculate break duration
+  const getBreakDuration = () => {
+    if (!isOnBreak || !breakStartTime) return null;
+    
+    const diffMs = new Date().getTime() - breakStartTime.getTime();
+    const minutes = Math.floor(diffMs / (1000 * 60));
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    
+    if (hours > 0) {
+      return `${hours}h ${mins}m`;
+    }
+    return `${mins}m`;
   };
 
   // Navigate months
@@ -319,27 +450,83 @@ const Attendance = () => {
             </span>
           </div>
 
-          {/* Clock Button */}
+          {/* Clock Button and Pause Button */}
           {!isClockedOut ? (
-            <button
-              onClick={isClockedIn ? handleClockOut : handleClockIn}
-              disabled={actionLoading}
-              className={cn(
-                "clock-btn",
-                isClockedIn ? "clock-btn-out" : "clock-btn-in",
-                isClockedIn && "pulse-glow",
-                actionLoading && "opacity-50 cursor-not-allowed"
-              )}
-            >
-              <div className="text-center">
-                {actionLoading ? (
-                  <Loader2 className="w-10 h-10 mx-auto mb-2 animate-spin" />
-                ) : (
-                  <Clock className="w-10 h-10 mx-auto mb-2" />
+            <div className="flex flex-col items-center gap-4">
+              <button
+                onClick={isClockedIn ? handleClockOut : handleClockIn}
+                disabled={actionLoading || isOnBreak}
+                className={cn(
+                  "clock-btn",
+                  isClockedIn ? "clock-btn-out" : "clock-btn-in",
+                  isClockedIn && !isOnBreak && "pulse-glow",
+                  (actionLoading || isOnBreak) && "opacity-50 cursor-not-allowed"
                 )}
-                <span>{isClockedIn ? "Clock Out" : "Clock In"}</span>
-              </div>
-            </button>
+              >
+                <div className="text-center">
+                  {actionLoading ? (
+                    <Loader2 className="w-10 h-10 mx-auto mb-2 animate-spin" />
+                  ) : (
+                    <Clock className="w-10 h-10 mx-auto mb-2" />
+                  )}
+                  <span>{isClockedIn ? "Clock Out" : "Clock In"}</span>
+                </div>
+              </button>
+
+              {/* Pause Button - Only show when clocked in and not on break */}
+              {isClockedIn && !isOnBreak && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      className="w-36 gap-2 border-warning/30 text-warning hover:bg-warning/10"
+                      disabled={actionLoading}
+                    >
+                      <Pause className="w-5 h-5" />
+                      Pause
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="center" className="w-48">
+                    <DropdownMenuItem
+                      onClick={() => handleStartBreak('washroom')}
+                      className="cursor-pointer"
+                    >
+                      <Coffee className="w-4 h-4 mr-2" />
+                      Break for Washroom
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => handleStartBreak('lunch')}
+                      className="cursor-pointer"
+                    >
+                      <UtensilsCrossed className="w-4 h-4 mr-2" />
+                      Break for Lunch
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => handleStartBreak('cigarette')}
+                      className="cursor-pointer"
+                    >
+                      <Cigarette className="w-4 h-4 mr-2" />
+                      Break for Cigarette
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+
+              {/* End Break Button - Show when on break */}
+              {isOnBreak && (
+                <Button
+                  onClick={handleEndBreak}
+                  variant="outline"
+                  size="lg"
+                  className="w-36 gap-2 border-success/30 text-success hover:bg-success/10"
+                  disabled={actionLoading}
+                >
+                  <Check className="w-5 h-5" />
+                  End Break
+                </Button>
+              )}
+            </div>
           ) : (
             <div className="w-36 h-36 rounded-full bg-muted flex items-center justify-center">
               <div className="text-center">
@@ -357,15 +544,29 @@ const Attendance = () => {
           </div>
 
           {isClockedIn && clockInTime && (
-            <p className="text-sm text-muted-foreground mt-4">
-              Clocked in since <span className="font-medium text-foreground">{clockInTime}</span>
+            <div className="text-sm text-muted-foreground mt-4 space-y-1">
+              <p>
+                Clocked in since <span className="font-medium text-foreground">{clockInTime}</span>
+              </p>
               {getWorkedTime() && (
-                <>
-                  <span className="mx-2">•</span>
-                  <span className="font-medium text-success">{getWorkedTime()} worked</span>
-                </>
+                <p>
+                  <span className="font-medium text-success">{getWorkedTime()}</span> worked
+                </p>
               )}
-            </p>
+              {isOnBreak && getBreakDuration() && (
+                <p className="text-warning">
+                  <Pause className="w-3 h-3 inline mr-1" />
+                  On break: <span className="font-medium">{getBreakDuration()}</span>
+                  {activeBreak?.reason && (
+                    <span className="ml-1">
+                      ({activeBreak.reason === 'washroom' ? 'Washroom' : 
+                        activeBreak.reason === 'lunch' ? 'Lunch' : 
+                        activeBreak.reason === 'cigarette' ? 'Cigarette' : 'Break'})
+                    </span>
+                  )}
+                </p>
+              )}
+            </div>
           )}
         </div>
 
