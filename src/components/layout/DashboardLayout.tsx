@@ -15,7 +15,8 @@ import {
   Megaphone,
   Loader2,
   CheckSquare,
-  Menu
+  Menu,
+  Video
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +47,7 @@ const navigation = [
   { name: "Attendance", href: "/attendance", icon: Clock },
   { name: "Leave", href: "/leave", icon: Calendar },
   { name: "Notices", href: "/notices", icon: Megaphone },
+  { name: "Meetings", href: "/meetings", icon: Video },
   { name: "Chat", href: "/chat", icon: MessageSquare },
   { name: "Settings", href: "/settings", icon: Settings },
 ];

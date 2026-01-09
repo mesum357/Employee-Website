@@ -7,12 +7,8 @@ import {
   ArrowUpRight,
   Megaphone,
   Ticket,
-  Mail,
-  DollarSign,
   Send,
   Plus,
-  Copy,
-  Check,
   Loader2,
   CheckSquare,
 } from "lucide-react";
@@ -28,7 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { attendanceAPI, noticeAPI, taskAPI } from "@/lib/api";
+import { attendanceAPI, noticeAPI, taskAPI, ticketAPI } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 
@@ -69,11 +65,6 @@ const priorityLevels = [
   { value: "urgent", label: "Urgent", color: "bg-destructive text-destructive-foreground" },
 ];
 
-const existingTickets = [
-  { id: "TKT-001", subject: "VPN Access Issue", category: "IT Support", priority: "high", status: "In Progress", date: "Dec 8, 2024" },
-  { id: "TKT-002", subject: "Salary Slip Correction", category: "Payroll Issue", priority: "medium", status: "Open", date: "Dec 7, 2024" },
-  { id: "TKT-003", subject: "New Laptop Request", category: "Equipment Request", priority: "low", status: "Resolved", date: "Dec 5, 2024" },
-];
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -93,17 +84,23 @@ const Dashboard = () => {
   const [ticketCategory, setTicketCategory] = useState("");
   const [ticketPriority, setTicketPriority] = useState("");
   const [ticketDescription, setTicketDescription] = useState("");
-  
-  // Email generator state
-  const [customerName, setCustomerName] = useState("");
-  const [businessName, setBusinessName] = useState("");
-  const [priceValue, setPriceValue] = useState("");
-  const [generatedEmail, setGeneratedEmail] = useState("");
-  const [copied, setCopied] = useState(false);
+  const [myTickets, setMyTickets] = useState<any[]>([]);
+  const [submittingTicket, setSubmittingTicket] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
+    fetchMyTickets();
   }, []);
+
+  const fetchMyTickets = async () => {
+    try {
+      const res = await ticketAPI.getMy();
+      const tickets = res.data.data.tickets || [];
+      setMyTickets(tickets.slice(0, 5)); // Show last 5 tickets
+    } catch (error: any) {
+      console.error("Error fetching tickets:", error);
+    }
+  };
 
   const fetchDashboardData = async () => {
     try {
@@ -205,75 +202,58 @@ const Dashboard = () => {
     },
   ];
 
-  const handleCreateTicket = () => {
+  const handleCreateTicket = async () => {
     if (!ticketSubject || !ticketCategory || !ticketPriority || !ticketDescription) {
       toast.error("Please fill in all fields");
       return;
     }
-    toast.success("Ticket created successfully!", {
-      description: `Ticket ID: TKT-${String(Math.floor(Math.random() * 900) + 100).padStart(3, '0')}`,
-    });
-    setTicketSubject("");
-    setTicketCategory("");
-    setTicketPriority("");
-    setTicketDescription("");
-  };
 
-  const handleGenerateEmail = () => {
-    if (!customerName || !businessName || !priceValue) {
-      toast.error("Please fill in all fields");
-      return;
+    setSubmittingTicket(true);
+    try {
+      const res = await ticketAPI.create({
+        subject: ticketSubject,
+        category: ticketCategory,
+        priority: ticketPriority,
+        description: ticketDescription
+      });
+
+      const ticket = res.data.data.ticket;
+      toast.success("Ticket created successfully!", {
+        description: `Ticket Number: ${ticket.ticketNumber}`,
+      });
+      
+      // Reset form
+      setTicketSubject("");
+      setTicketCategory("");
+      setTicketPriority("");
+      setTicketDescription("");
+      
+      // Refresh tickets list
+      await fetchMyTickets();
+    } catch (error: any) {
+      console.error("Error creating ticket:", error);
+      toast.error(error.response?.data?.message || "Failed to create ticket");
+    } finally {
+      setSubmittingTicket(false);
     }
-    
-    const email = `Subject: Increase ${businessName} Bookings with a $${priceValue} Digital Package
-
-Dear ${customerName},
-
-I hope this email finds you well.
-
-My name is [Your Name] and I am reaching out from MMH Corporate. We specialize in providing service-based businesses like ${businessName} with effective, affordable technology solutions designed to boost customer traffic and streamline operations.
-
-We recognize that a seamless customer experience drives repeat business. We have designed a powerful, introductory tech package to help you achieve this, which includes:
-
-• Online Booking Integration: Allow customers to pre-pay and schedule washes through your website, drastically reducing walk-away customers.
-
-• Digital Presence Upgrade: Ensure your website clearly promotes your services and looks professional on all devices.
-
-• Basic Digital Marketing Consultation: A strategy session to help you effectively reach more local customers.
-
-We are offering this complete foundational package for just $${priceValue}. This is a high-value investment that delivers immediate improvements in customer convenience and operational efficiency.
-
-Would you be open to a quick 10-minute call next week to review exactly what the $${priceValue} package includes and how it can start benefiting ${businessName} immediately?
-
-Best regards,
-
-[Your Name]
-MMH Corporate
-[Phone Number]
-[Website URL]`;
-
-    setGeneratedEmail(email);
-    toast.success("Email generated successfully!");
-  };
-
-  const handleCopyEmail = () => {
-    navigator.clipboard.writeText(generatedEmail);
-    setCopied(true);
-    toast.success("Email copied to clipboard!");
-    setTimeout(() => setCopied(false), 2000);
   };
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "Open":
+    switch (status.toLowerCase()) {
+      case "open":
         return "bg-warning-light text-warning";
-      case "In Progress":
+      case "in-progress":
         return "bg-primary-light text-primary";
-      case "Resolved":
+      case "resolved":
+      case "closed":
         return "bg-success-light text-success";
       default:
         return "bg-muted text-muted-foreground";
     }
+  };
+
+  const formatTicketStatus = (status: string) => {
+    return status.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
   };
 
   const userName = user?.employee 
@@ -338,10 +318,6 @@ MMH Corporate
             <TabsTrigger value="tickets" className="flex-1 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm">
               <Ticket className="w-4 h-4 mr-2" />
               Tickets
-            </TabsTrigger>
-            <TabsTrigger value="email" className="flex-1 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm">
-              <Mail className="w-4 h-4 mr-2" />
-              Email Generator
             </TabsTrigger>
           </TabsList>
 
@@ -550,9 +526,22 @@ MMH Corporate
                     />
                   </div>
                   
-                  <Button className="w-full shadow-glow" onClick={handleCreateTicket}>
-                    <Send className="w-4 h-4 mr-2" />
-                    Submit Ticket
+                  <Button 
+                    className="w-full shadow-glow" 
+                    onClick={handleCreateTicket}
+                    disabled={submittingTicket}
+                  >
+                    {submittingTicket ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Submitting...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4 mr-2" />
+                        Submit Ticket
+                      </>
+                    )}
                   </Button>
                 </div>
               </div>
@@ -572,160 +561,47 @@ MMH Corporate
                 </div>
 
                 <div className="space-y-3">
-                  {existingTickets.map((ticket) => (
-                    <div 
-                      key={ticket.id}
-                      className="p-4 rounded-xl bg-secondary/50 hover:bg-secondary transition-all cursor-pointer border border-transparent hover:border-primary/20"
-                    >
-                      <div className="flex items-start justify-between gap-3 mb-2">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-mono text-muted-foreground">{ticket.id}</span>
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(ticket.status)}`}>
-                              {ticket.status}
-                            </span>
-                          </div>
-                          <h4 className="font-medium text-foreground mt-1">{ticket.subject}</h4>
-                        </div>
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                          priorityLevels.find(p => p.value === ticket.priority)?.color || ''
-                        }`}>
-                          {ticket.priority.charAt(0).toUpperCase() + ticket.priority.slice(1)}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>{ticket.category}</span>
-                        <span>{ticket.date}</span>
-                      </div>
+                  {myTickets.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Ticket className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                      <p>No tickets yet</p>
+                      <p className="text-xs mt-2">Submit a ticket to get started</p>
                     </div>
-                  ))}
+                  ) : (
+                    myTickets.map((ticket) => (
+                      <div 
+                        key={ticket._id}
+                        className="p-4 rounded-xl bg-secondary/50 hover:bg-secondary transition-all cursor-pointer border border-transparent hover:border-primary/20"
+                      >
+                        <div className="flex items-start justify-between gap-3 mb-2">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-mono text-muted-foreground">{ticket.ticketNumber}</span>
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(ticket.status)}`}>
+                                {formatTicketStatus(ticket.status)}
+                              </span>
+                            </div>
+                            <h4 className="font-medium text-foreground mt-1">{ticket.subject}</h4>
+                          </div>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
+                            priorityLevels.find(p => p.value === ticket.priority)?.color || ''
+                          }`}>
+                            {ticket.priority.charAt(0).toUpperCase() + ticket.priority.slice(1)}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>{ticket.category}</span>
+                          <span>{formatDate(ticket.createdAt)}</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
 
                 <Button variant="outline" className="w-full mt-4">
                   View All Tickets
                   <ArrowUpRight className="w-4 h-4 ml-2" />
                 </Button>
-              </div>
-            </div>
-          </TabsContent>
-
-          {/* Email Generator Tab */}
-          <TabsContent value="email" className="mt-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Email Form */}
-              <div className="dashboard-card">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 rounded-xl bg-primary-light flex items-center justify-center">
-                    <Mail className="w-5 h-5 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="text-h4 text-foreground">Quick Email Generator</h3>
-                    <p className="text-sm text-muted-foreground">Generate professional outreach emails instantly</p>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium text-foreground mb-2 block">
-                      Customer Name (Manager/Owner)
-                    </label>
-                    <Input 
-                      placeholder="e.g., John Smith"
-                      value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-medium text-foreground mb-2 block">
-                      Customer Business Name
-                    </label>
-                    <Input 
-                      placeholder="e.g., ABC Car Wash"
-                      value={businessName}
-                      onChange={(e) => setBusinessName(e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-medium text-foreground mb-2 block">
-                      Package Price Value ($)
-                    </label>
-                    <div className="relative">
-                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input 
-                        placeholder="5000"
-                        className="pl-9"
-                        value={priceValue}
-                        onChange={(e) => setPriceValue(e.target.value.replace(/[^0-9]/g, ''))}
-                      />
-                    </div>
-                  </div>
-
-                  <Button className="w-full shadow-glow" onClick={handleGenerateEmail}>
-                    <Send className="w-4 h-4 mr-2" />
-                    Generate Email
-                  </Button>
-                </div>
-
-                {/* Tips */}
-                <div className="mt-6 p-4 rounded-xl bg-accent-light/50 border border-accent/20">
-                  <h4 className="text-sm font-medium text-accent mb-2">💡 Pro Tips</h4>
-                  <ul className="text-xs text-muted-foreground space-y-1">
-                    <li>• Replace [Your Name] with your actual name</li>
-                    <li>• Add your phone number and website URL</li>
-                    <li>• Personalize the email based on the business type</li>
-                  </ul>
-                </div>
-              </div>
-
-              {/* Generated Email Preview */}
-              <div className="dashboard-card">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-success-light flex items-center justify-center">
-                      <Send className="w-5 h-5 text-success" />
-                    </div>
-                    <div>
-                      <h3 className="text-h4 text-foreground">Email Preview</h3>
-                      <p className="text-sm text-muted-foreground">Your generated email will appear here</p>
-                    </div>
-                  </div>
-                  {generatedEmail && (
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={handleCopyEmail}
-                      className="flex items-center gap-2"
-                    >
-                      {copied ? (
-                        <>
-                          <Check className="w-4 h-4 text-success" />
-                          Copied!
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-4 h-4" />
-                          Copy
-                        </>
-                      )}
-                    </Button>
-                  )}
-                </div>
-
-                {generatedEmail ? (
-                  <div className="bg-secondary/30 rounded-xl p-4 max-h-[450px] overflow-y-auto">
-                    <pre className="whitespace-pre-wrap text-sm text-foreground font-sans leading-relaxed">
-                      {generatedEmail}
-                    </pre>
-                  </div>
-                ) : (
-                  <div className="h-[300px] flex flex-col items-center justify-center text-center bg-secondary/30 rounded-xl">
-                    <Mail className="w-12 h-12 text-muted-foreground/30 mb-3" />
-                    <p className="text-muted-foreground">Fill in the details and click "Generate Email"</p>
-                    <p className="text-xs text-muted-foreground/70 mt-1">Your professional email will appear here</p>
-                  </div>
-                )}
               </div>
             </div>
           </TabsContent>

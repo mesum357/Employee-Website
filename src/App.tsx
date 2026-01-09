@@ -13,6 +13,7 @@ import Dashboard from "./pages/Dashboard";
 import Attendance from "./pages/Attendance";
 import Leave from "./pages/Leave";
 import Notices from "./pages/Notices";
+import Meetings from "./pages/Meetings";
 import Chat from "./pages/Chat";
 import Settings from "./pages/Settings";
 import Profile from "./pages/Profile";
@@ -72,6 +73,7 @@ const AppRoutes = () => (
     <Route path="/attendance" element={<ProtectedPage><Attendance /></ProtectedPage>} />
     <Route path="/leave" element={<ProtectedPage><Leave /></ProtectedPage>} />
     <Route path="/notices" element={<ProtectedPage><Notices /></ProtectedPage>} />
+    <Route path="/meetings" element={<ProtectedPage><Meetings /></ProtectedPage>} />
     <Route path="/chat" element={<ProtectedPage><Chat /></ProtectedPage>} />
     <Route path="/settings" element={<ProtectedPage><Settings /></ProtectedPage>} />
     <Route path="/profile" element={<ProtectedPage><Profile /></ProtectedPage>} />

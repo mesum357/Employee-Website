@@ -169,6 +169,32 @@ export const taskAPI = {
     }),
 };
 
+// Ticket API
+export const ticketAPI = {
+  create: (data: { subject: string; category: string; priority: string; description: string }) =>
+    api.post('/tickets', data),
+  getMy: () =>
+    api.get('/tickets/my'),
+  getAll: (params?: any) =>
+    api.get('/tickets', { params }),
+  getById: (id: string) =>
+    api.get(`/tickets/${id}`),
+};
+
+// Meeting API
+export const meetingAPI = {
+  getAll: (params?: any) =>
+    api.get('/meetings', { params }),
+  getUpcoming: () =>
+    api.get('/meetings/upcoming'),
+  getToday: () =>
+    api.get('/meetings/today'),
+  getById: (id: string) =>
+    api.get(`/meetings/${id}`),
+  respond: (id: string, response: 'accepted' | 'declined' | 'tentative') =>
+    api.put(`/meetings/${id}/respond`, { response }),
+};
+
 // Report API
 export const reportAPI = {
   getDashboard: () =>
