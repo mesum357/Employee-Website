@@ -106,10 +106,23 @@ const Dashboard = () => {
     try {
       setLoading(true);
       
-      // Fetch today's attendance
-      const todayRes = await attendanceAPI.getToday();
-      const todayData = todayRes.data.data;
+      // Prepare dates
+      const now = new Date();
+      const month = now.getMonth() + 1;
+      const year = now.getFullYear();
+      const nextWeek = new Date();
+      nextWeek.setDate(nextWeek.getDate() + 7);
       
+      // Fetch all data in parallel for better performance
+      const [todayRes, monthlyRes, noticesRes, tasksRes] = await Promise.all([
+        attendanceAPI.getToday().catch(() => ({ data: { data: { isCheckedIn: false } } })),
+        attendanceAPI.getMy(month, year).catch(() => ({ data: { data: { summary: {} } } })),
+        noticeAPI.getRecent().catch(() => ({ data: { data: { notices: [] } } })),
+        taskAPI.getMy().catch(() => ({ data: { data: { tasks: [] } } }))
+      ]);
+      
+      // Process today's attendance
+      const todayData = todayRes.data.data;
       if (todayData.isCheckedIn) {
         const checkInTime = new Date(todayData.attendance?.checkIn?.time || new Date());
         setTodayStatus("Clocked In");
@@ -123,13 +136,8 @@ const Dashboard = () => {
         setClockInTime("");
       }
 
-      // Fetch monthly attendance rate
-      const now = new Date();
-      const month = now.getMonth() + 1;
-      const year = now.getFullYear();
-      const monthlyRes = await attendanceAPI.getMy(month, year);
+      // Process monthly attendance rate
       const monthlyData = monthlyRes.data.data;
-      
       if (monthlyData.summary) {
         const total = monthlyData.summary.present + monthlyData.summary.absent + 
                      monthlyData.summary.late + monthlyData.summary.onLeave;
@@ -138,16 +146,12 @@ const Dashboard = () => {
         setMonthlyAttendanceRate(rate);
       }
 
-      // Fetch recent notices
-      const noticesRes = await noticeAPI.getRecent();
+      // Process recent notices
       const notices = noticesRes.data.data.notices || [];
       setRecentNotices(notices.slice(0, 3));
 
-      // Fetch upcoming tasks (due in next 7 days)
-      const tasksRes = await taskAPI.getMy();
+      // Process upcoming tasks
       const tasks = tasksRes.data.data.tasks || [];
-      const nextWeek = new Date();
-      nextWeek.setDate(nextWeek.getDate() + 7);
       const upcoming = tasks
         .filter((task: Task) => {
           const dueDate = new Date(task.dueDate);
