@@ -23,7 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
-import { taskAPI, noticeAPI } from "@/lib/api";
+import { taskAPI, noticeAPI, chatAPI } from "@/lib/api";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Sheet,
@@ -57,6 +57,7 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pendingTasksCount, setPendingTasksCount] = useState(0);
   const [unreadNoticesCount, setUnreadNoticesCount] = useState(0);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout, isAuthenticated, isLoading } = useAuth();
@@ -66,10 +67,12 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     if (isAuthenticated && user) {
       fetchPendingTasks();
       fetchUnreadNotices();
+      fetchUnreadMessages();
       // Refresh every 30 seconds
       const interval = setInterval(() => {
         fetchPendingTasks();
         fetchUnreadNotices();
+        fetchUnreadMessages();
       }, 30000);
       
       // Listen for refresh events from notices page
@@ -78,9 +81,16 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       };
       window.addEventListener('refreshUnreadNotices', handleRefresh);
       
+      // Listen for refresh events from chat page
+      const handleChatRefresh = () => {
+        fetchUnreadMessages();
+      };
+      window.addEventListener('refreshUnreadMessages', handleChatRefresh);
+      
       return () => {
         clearInterval(interval);
         window.removeEventListener('refreshUnreadNotices', handleRefresh);
+        window.removeEventListener('refreshUnreadMessages', handleChatRefresh);
       };
     }
   }, [isAuthenticated, user]);
@@ -115,6 +125,22 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       setUnreadNoticesCount(unreadCount);
     } catch (error) {
       // Silently fail - notices might not be available
+    }
+  };
+
+  const fetchUnreadMessages = async () => {
+    try {
+      const response = await chatAPI.getAll();
+      const chats = response.data.data.chats || [];
+      
+      // Sum up unread counts from all chats
+      const totalUnread = chats.reduce((sum: number, chat: any) => {
+        return sum + (chat.unreadCount || 0);
+      }, 0);
+      
+      setUnreadMessagesCount(totalUnread);
+    } catch (error) {
+      // Silently fail - chat might not be available
     }
   };
 
@@ -156,19 +182,27 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
 
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-        {navigation.map((item) => (
-          <button
-            key={item.name}
-            onClick={() => onNavClick(item.href)}
-            className={cn(
-              "nav-link w-full",
-              isActive(item.href) && "active"
-            )}
-          >
-            <item.icon className="w-5 h-5 flex-shrink-0" />
-            {!collapsed && <span>{item.name}</span>}
-          </button>
-        ))}
+        {navigation.map((item) => {
+          const showBadge = item.name === 'Chat' && unreadMessagesCount > 0;
+          return (
+            <button
+              key={item.name}
+              onClick={() => onNavClick(item.href)}
+              className={cn(
+                "nav-link w-full relative",
+                isActive(item.href) && "active"
+              )}
+            >
+              <item.icon className="w-5 h-5 flex-shrink-0" />
+              {!collapsed && <span>{item.name}</span>}
+              {showBadge && (
+                <Badge className="absolute top-1 right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-destructive text-destructive-foreground">
+                  {unreadMessagesCount > 9 ? '9+' : unreadMessagesCount}
+                </Badge>
+              )}
+            </button>
+          );
+        })}
       </nav>
 
       {/* Collapse Button - only show on desktop */}

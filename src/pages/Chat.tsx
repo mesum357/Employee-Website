@@ -12,13 +12,14 @@ import {
   MoreVertical,
   Phone,
   Video,
-  Image,
+  Image as ImageIcon,
   File,
   Check,
   CheckCheck,
   Circle,
   Loader2,
   AlertCircle,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { chatAPI, messageRequestAPI } from "@/lib/api";
@@ -51,6 +52,12 @@ interface Message {
   sender: { _id: string; email: string } | string;
   content: string;
   messageType?: string;
+  attachments?: Array<{
+    name: string;
+    url: string;
+    type: string;
+    size?: number;
+  }>;
   createdAt: string;
   readBy?: Array<{ user: string }>;
   isDeleted?: boolean;
@@ -66,6 +73,7 @@ interface Chat {
     createdAt: string;
   };
   messages?: Message[];
+  unreadCount?: number;
 }
 
 const Chat = () => {
@@ -80,6 +88,11 @@ const Chat = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [sending, setSending] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploadedAttachments, setUploadedAttachments] = useState<any[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const socketRef = useRef<Socket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -244,6 +257,11 @@ const Chat = () => {
 
       setSelectedChat(chatWithMessages);
       setMessages(chatWithMessages.messages?.filter((m: Message) => !m.isDeleted) || []);
+      
+      // Refresh unread count in sidebar (messages are marked as read when fetching)
+      window.dispatchEvent(new CustomEvent('refreshUnreadMessages'));
+      // Refresh chat list to update unread counts
+      fetchChats();
     } catch (err: any) {
       console.error('Error loading chat:', err);
       setError(err.response?.data?.message || 'Failed to load messages');
@@ -252,16 +270,60 @@ const Chat = () => {
     }
   };
 
+  const handleFileUpload = async (file: File, isImage: boolean) => {
+    try {
+      setUploading(true);
+      const response = await chatAPI.uploadFile(file);
+      if (response.data.success) {
+        const attachment = {
+          ...response.data.data,
+          type: isImage ? 'image' : 'file'
+        };
+        setUploadedAttachments(prev => [...prev, attachment]);
+      }
+    } catch (err: any) {
+      console.error('Error uploading file:', err);
+      setError(err.response?.data?.message || 'Failed to upload file');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, isImage: boolean) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    Array.from(files).forEach(file => {
+      handleFileUpload(file, isImage);
+    });
+
+    // Reset input
+    e.target.value = '';
+  };
+
+  const removeAttachment = (index: number) => {
+    setUploadedAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSendMessage = async () => {
-    if (!messageInput.trim() || !selectedChat || sending) return;
+    if ((!messageInput.trim() && uploadedAttachments.length === 0) || !selectedChat || sending) return;
 
     const messageContent = messageInput.trim();
+    const attachments = [...uploadedAttachments];
     setMessageInput(""); // Clear input immediately for better UX
+    setUploadedAttachments([]); // Clear attachments
     
     try {
       setSending(true);
       
-      const response = await chatAPI.sendMessage(selectedChat._id, messageContent);
+      // Determine message type based on attachments
+      let messageType = 'text';
+      if (attachments.length > 0) {
+        const hasImage = attachments.some(att => att.type === 'image');
+        messageType = hasImage ? 'image' : 'file';
+      }
+      
+      const response = await chatAPI.sendMessage(selectedChat._id, messageContent, messageType, attachments);
       
       if (response.data.success) {
         // Add message immediately for sender (optimistic update)
@@ -283,6 +345,7 @@ const Chat = () => {
       setError(err.response?.data?.message || 'Failed to send message');
       // Restore input on error
       setMessageInput(messageContent);
+      setUploadedAttachments(attachments);
     } finally {
       setSending(false);
     }
@@ -444,11 +507,9 @@ const Chat = () => {
                           <p className="text-small text-muted-foreground truncate">
                             {chat.lastMessage?.content || 'No messages yet'}
                           </p>
-                          {chat.lastMessage && 
-                           chat.lastMessage.sender._id.toString() !== user?.id &&
-                           !isMessageRead({ ...chat.lastMessage, readBy: [] } as Message) && (
+                          {chat.unreadCount && chat.unreadCount > 0 && (
                             <Badge className="bg-primary text-primary-foreground min-w-[20px] h-5 flex items-center justify-center text-xs">
-                              1
+                              {chat.unreadCount > 9 ? '9+' : chat.unreadCount}
                             </Badge>
                           )}
                         </div>
@@ -589,7 +650,45 @@ const Chat = () => {
                             : "bg-secondary text-foreground rounded-bl-md"
                         )}
                       >
-                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        {message.attachments && message.attachments.length > 0 && (
+                          <div className="mb-2 space-y-2">
+                            {message.attachments.map((attachment, idx) => (
+                              <div key={idx} className="rounded-lg overflow-hidden">
+                                {attachment.type === 'image' ? (
+                                  <img
+                                    src={`${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}${attachment.url}`}
+                                    alt={attachment.name}
+                                    className="max-w-full max-h-64 rounded-lg object-cover cursor-pointer"
+                                    onClick={() => window.open(`${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}${attachment.url}`, '_blank')}
+                                  />
+                                ) : (
+                                  <a
+                                    href={`${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}${attachment.url}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className={cn(
+                                      "flex items-center gap-2 p-2 rounded-lg border",
+                                      isMe 
+                                        ? "bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground"
+                                        : "bg-secondary border-border text-foreground"
+                                    )}
+                                  >
+                                    <File className="w-4 h-4" />
+                                    <span className="text-sm truncate flex-1">{attachment.name}</span>
+                                    {attachment.size && (
+                                      <span className="text-xs opacity-70">
+                                        {(attachment.size / 1024 / 1024).toFixed(2)} MB
+                                      </span>
+                                    )}
+                                  </a>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {message.content && (
+                          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        )}
                         <div className={cn(
                           "flex items-center gap-1 mt-1",
                           isMe ? "justify-end" : "justify-start"
@@ -623,12 +722,70 @@ const Chat = () => {
                 {error}
               </div>
             )}
+            {uploadedAttachments.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-2">
+                {uploadedAttachments.map((attachment, idx) => (
+                  <div key={idx} className="relative inline-block">
+                    {attachment.type === 'image' ? (
+                      <div className="relative w-20 h-20 rounded-lg overflow-hidden border border-border">
+                        <img
+                          src={`${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}${attachment.url}`}
+                          alt={attachment.name}
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          onClick={() => removeAttachment(idx)}
+                          className="absolute top-1 right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center hover:bg-destructive/90"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-secondary">
+                        <File className="w-4 h-4" />
+                        <span className="text-xs truncate max-w-[100px]">{attachment.name}</span>
+                        <button
+                          onClick={() => removeAttachment(idx)}
+                          className="ml-1 w-4 h-4 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center hover:bg-destructive/90"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon">
+              <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
+                onChange={(e) => handleFileSelect(e, false)}
+              />
+              <input
+                type="file"
+                ref={imageInputRef}
+                className="hidden"
+                accept="image/*"
+                onChange={(e) => handleFileSelect(e, true)}
+              />
+              <Button 
+                variant="ghost" 
+                size="icon"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+              >
                 <Paperclip className="w-5 h-5" />
               </Button>
-              <Button variant="ghost" size="icon">
-                <Image className="w-5 h-5" />
+              <Button 
+                variant="ghost" 
+                size="icon"
+                onClick={() => imageInputRef.current?.click()}
+                disabled={uploading}
+              >
+                <ImageIcon className="w-5 h-5" />
               </Button>
               <Input
                 placeholder="Type a message..."
@@ -641,17 +798,17 @@ const Chat = () => {
                     handleSendMessage();
                   }
                 }}
-                disabled={sending}
+                disabled={sending || uploading}
               />
               <Button variant="ghost" size="icon">
                 <Smile className="w-5 h-5" />
               </Button>
               <Button 
                 size="icon" 
-                disabled={!messageInput.trim() || sending}
+                disabled={(!messageInput.trim() && uploadedAttachments.length === 0) || sending || uploading}
                 onClick={handleSendMessage}
               >
-                {sending ? (
+                {(sending || uploading) ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
                 ) : (
                   <Send className="w-5 h-5" />

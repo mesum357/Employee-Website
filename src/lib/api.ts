@@ -135,8 +135,17 @@ export const chatAPI = {
     api.get('/chat/users'),
   createPrivate: (userId: string) =>
     api.post('/chat/private', { userId }),
-  sendMessage: (chatId: string, content: string, messageType?: string) =>
-    api.post(`/chat/${chatId}/message`, { content, messageType }),
+  uploadFile: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/chat/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+  sendMessage: (chatId: string, content: string, messageType?: string, attachments?: any[]) =>
+    api.post(`/chat/${chatId}/message`, { content, messageType, attachments }),
 };
 
 // Message Request API

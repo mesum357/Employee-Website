@@ -99,6 +99,8 @@ const Dashboard = () => {
       setMyTickets(tickets.slice(0, 5)); // Show last 5 tickets
     } catch (error: any) {
       console.error("Error fetching tickets:", error);
+      // Silently fail - tickets might not be available if employee record is missing
+      setMyTickets([]);
     }
   };
 
@@ -236,7 +238,13 @@ const Dashboard = () => {
       await fetchMyTickets();
     } catch (error: any) {
       console.error("Error creating ticket:", error);
-      toast.error(error.response?.data?.message || "Failed to create ticket");
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || "Failed to create ticket";
+      toast.error(errorMessage);
+      
+      // If error is about missing employee record, show helpful message
+      if (errorMessage.includes('Employee record not found')) {
+        toast.error("Please contact HR to associate an employee profile with your account.");
+      }
     } finally {
       setSubmittingTicket(false);
     }
