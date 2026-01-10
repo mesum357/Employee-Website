@@ -15,6 +15,7 @@ import Leave from "./pages/Leave";
 import Notices from "./pages/Notices";
 import Meetings from "./pages/Meetings";
 import Chat from "./pages/Chat";
+import Report from "./pages/Report";
 import Settings from "./pages/Settings";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
@@ -75,6 +76,7 @@ const AppRoutes = () => (
     <Route path="/notices" element={<ProtectedPage><Notices /></ProtectedPage>} />
     <Route path="/meetings" element={<ProtectedPage><Meetings /></ProtectedPage>} />
     <Route path="/chat" element={<ProtectedPage><Chat /></ProtectedPage>} />
+    <Route path="/report" element={<ProtectedPage><Report /></ProtectedPage>} />
     <Route path="/settings" element={<ProtectedPage><Settings /></ProtectedPage>} />
     <Route path="/profile" element={<ProtectedPage><Profile /></ProtectedPage>} />
     

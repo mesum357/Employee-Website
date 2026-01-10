@@ -206,6 +206,12 @@ export const meetingAPI = {
 
 // Report API
 export const reportAPI = {
+  create: (data: { headset: boolean; sales: number }) =>
+    api.post('/reports', data),
+  getMy: (params?: any) =>
+    api.get('/reports/my', { params }),
+  getToday: () =>
+    api.get('/reports/today'),
   getDashboard: () =>
     api.get('/reports/dashboard'),
   getEmployeeReport: (id: string) =>

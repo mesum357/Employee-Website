@@ -112,6 +112,10 @@ const Notices = () => {
         // Update selected notice with fresh data
         const response = await noticeAPI.getById(notice._id);
         setSelectedNotice(response.data.data.notice);
+        
+        // Refresh unread count in navbar
+        const event = new CustomEvent('refreshUnreadNotices');
+        window.dispatchEvent(event);
       } catch (err) {
         console.error("Error marking notice as read:", err);
       }

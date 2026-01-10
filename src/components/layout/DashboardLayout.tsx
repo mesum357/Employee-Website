@@ -16,7 +16,8 @@ import {
   Loader2,
   CheckSquare,
   Menu,
-  Video
+  Video,
+  ClipboardList
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,6 +49,7 @@ const navigation = [
   { name: "Leave", href: "/leave", icon: Calendar },
   { name: "Notices", href: "/notices", icon: Megaphone },
   { name: "Meetings", href: "/meetings", icon: Video },
+  { name: "Report", href: "/report", icon: ClipboardList },
   { name: "Chat", href: "/chat", icon: MessageSquare },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
@@ -157,6 +159,12 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
 
   const handleNavClick = (href: string) => {
     navigate(href);
+    // Refresh unread counts when navigating to relevant pages
+    if (href === '/notices') {
+      fetchUnreadNotices();
+    } else if (href === '/chat') {
+      fetchUnreadMessages();
+    }
     // Close sidebar on mobile/tablet after navigation
     if (isMobile || (typeof window !== 'undefined' && window.innerWidth < 1024)) {
       setSidebarOpen(false);
@@ -183,7 +191,11 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
         {navigation.map((item) => {
-          const showBadge = item.name === 'Chat' && unreadMessagesCount > 0;
+          const showChatBadge = item.name === 'Chat' && unreadMessagesCount > 0;
+          const showNoticesBadge = item.name === 'Notices' && unreadNoticesCount > 0;
+          const showBadge = showChatBadge || showNoticesBadge;
+          const badgeCount = item.name === 'Chat' ? unreadMessagesCount : unreadNoticesCount;
+          
           return (
             <button
               key={item.name}
@@ -197,7 +209,7 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
               {!collapsed && <span>{item.name}</span>}
               {showBadge && (
                 <Badge className="absolute top-1 right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-destructive text-destructive-foreground">
-                  {unreadMessagesCount > 9 ? '9+' : unreadMessagesCount}
+                  {badgeCount > 9 ? '9+' : badgeCount}
                 </Badge>
               )}
             </button>
