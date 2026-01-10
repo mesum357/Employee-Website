@@ -44,6 +44,17 @@ interface LeaveBalance {
   sick: number;
   casual: number;
   unpaid: number;
+  maternity?: number;
+  paternity?: number;
+  other?: number;
+}
+
+interface LeaveBalanceData {
+  balance: LeaveBalance; // Total/limit from policies
+  used: LeaveBalance; // Used this month
+  remaining: LeaveBalance; // Remaining this month
+  totals: LeaveBalance; // Same as balance for backward compatibility
+  policies?: Array<{ leaveType: string; monthlyLimit: number }>;
 }
 
 interface LeaveRecord {
@@ -77,9 +88,21 @@ const Leave = () => {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [leaveBalance, setLeaveBalance] = useState<LeaveBalance>({
-    annual: 15,
-    sick: 10,
-    casual: 5,
+    annual: 0,
+    sick: 0,
+    casual: 0,
+    unpaid: 0
+  });
+  const [leaveUsed, setLeaveUsed] = useState<LeaveBalance>({
+    annual: 0,
+    sick: 0,
+    casual: 0,
+    unpaid: 0
+  });
+  const [leaveRemaining, setLeaveRemaining] = useState<LeaveBalance>({
+    annual: 0,
+    sick: 0,
+    casual: 0,
     unpaid: 0
   });
   const [leaveHistory, setLeaveHistory] = useState<LeaveRecord[]>([]);
@@ -102,8 +125,19 @@ const Leave = () => {
 
       setLeaveHistory(myLeavesResponse.data.data.leaves || []);
       
-      if (balanceResponse.data.data.balance) {
-        setLeaveBalance(balanceResponse.data.data.balance);
+      // Update balance, used, and remaining from backend response
+      if (balanceResponse.data.data) {
+        const balanceData: LeaveBalanceData = balanceResponse.data.data;
+        
+        if (balanceData.balance) {
+          setLeaveBalance(balanceData.balance);
+        }
+        if (balanceData.used) {
+          setLeaveUsed(balanceData.used);
+        }
+        if (balanceData.remaining) {
+          setLeaveRemaining(balanceData.remaining);
+        }
       }
 
     } catch (err: any) {
@@ -212,13 +246,18 @@ const Leave = () => {
   };
 
   const getLeaveTypeBalance = (type: string) => {
+    // Returns total/limit from HR policies
     return leaveBalance[type as keyof LeaveBalance] || 0;
   };
 
   const getLeaveTypeUsed = (type: string) => {
-    return leaveHistory
-      .filter(l => l.leaveType === type && l.status === 'approved')
-      .reduce((sum, l) => sum + l.totalDays, 0);
+    // Returns used days for current month (from backend)
+    return leaveUsed[type as keyof LeaveBalance] || 0;
+  };
+
+  const getLeaveTypeRemaining = (type: string) => {
+    // Returns remaining days for current month (from backend)
+    return leaveRemaining[type as keyof LeaveBalance] || 0;
   };
 
   if (loading) {
@@ -272,11 +311,25 @@ const Leave = () => {
               {/* Balance Indicator */}
               {selectedType && (
                 <Card className="p-4 bg-primary-light/50 border-primary/20">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-foreground">Remaining Balance</span>
-                    <span className="text-h4 text-primary">
-                      {getLeaveTypeBalance(selectedType)} days
-                    </span>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-foreground">Monthly Limit (from HR Policy)</span>
+                      <span className="text-sm font-medium text-foreground">
+                        {getLeaveTypeBalance(selectedType)} days
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-foreground">Used This Month</span>
+                      <span className="text-sm font-medium text-foreground">
+                        {getLeaveTypeUsed(selectedType)} days
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between pt-2 border-t border-primary/20">
+                      <span className="text-sm font-medium text-foreground">Remaining Balance</span>
+                      <span className="text-h4 text-primary font-bold">
+                        {getLeaveTypeRemaining(selectedType)} days
+                      </span>
+                    </div>
                   </div>
                 </Card>
               )}
@@ -393,9 +446,9 @@ const Leave = () => {
       {/* Leave Balance Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {leaveTypeConfig.map((type, index) => {
-          const balance = getLeaveTypeBalance(type.id);
-          const used = getLeaveTypeUsed(type.id);
-          const remaining = balance - used;
+          const balance = getLeaveTypeBalance(type.id); // Total/limit from HR policies
+          const used = getLeaveTypeUsed(type.id); // Used this month
+          const remaining = getLeaveTypeRemaining(type.id); // Remaining this month (from backend)
           const Icon = type.icon;
           
           return (
@@ -412,10 +465,13 @@ const Leave = () => {
                 </div>
                 <div className="text-right">
                   <p className="text-h3 text-foreground">{remaining}</p>
-                  <p className="text-caption">of {balance}</p>
+                  <p className="text-caption text-muted-foreground">of {balance} days</p>
                 </div>
               </div>
               <p className="text-sm font-medium text-foreground mt-2">{type.name}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {used} days used this month
+              </p>
               <div className="w-full bg-secondary rounded-full h-2 mt-2">
                 <div 
                   className="bg-primary h-2 rounded-full transition-all duration-500"
