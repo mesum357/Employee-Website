@@ -206,10 +206,14 @@ export const meetingAPI = {
 
 // Report API
 export const reportAPI = {
-  create: (data: { headset: boolean; sales: number }) =>
+  create: (data: { headset: number; sales: number }) =>
     api.post('/reports', data),
   getMy: (params?: any) =>
     api.get('/reports/my', { params }),
+  getWeekly: () =>
+    api.get('/reports/my/weekly'),
+  getMonthly: () =>
+    api.get('/reports/my/monthly'),
   getToday: () =>
     api.get('/reports/today'),
   getDashboard: () =>

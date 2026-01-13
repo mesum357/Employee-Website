@@ -108,7 +108,11 @@ const Chat = () => {
       transports: ['websocket', 'polling'],
       auth: {
         token: localStorage.getItem('token')
-      }
+      },
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: 5
     });
 
     socketRef.current = socket;
@@ -117,7 +121,7 @@ const Chat = () => {
     socket.emit('join', user.id);
 
     // Listen for new messages
-    socket.on('newMessage', (data: { chatId: string; message: Message }) => {
+    const handleNewMessage = (data: { chatId: string; message: Message }) => {
       if (selectedChat && data.chatId === selectedChat._id) {
         setMessages(prev => {
           // Check if message already exists to prevent duplicates
@@ -132,7 +136,9 @@ const Chat = () => {
       
       // Update chat list
       fetchChats();
-    });
+    };
+
+    socket.on('newMessage', handleNewMessage);
 
     // Handle typing indicators
     socket.on('userTyping', (data: { userId: string; chatId: string; isTyping: boolean }) => {
@@ -148,10 +154,16 @@ const Chat = () => {
       console.log('Disconnected from socket');
     });
 
+    socket.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
+    });
+
     return () => {
+      socket.off('newMessage', handleNewMessage);
       socket.disconnect();
+      socketRef.current = null;
     };
-  }, [user, selectedChat]);
+  }, [user?.id]); // Only depend on user.id, not selectedChat
 
   // Fetch all users and chats on mount
   useEffect(() => {
