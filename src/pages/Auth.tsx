@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,12 +16,6 @@ import api from "@/lib/api";
 
 type AuthMode = "login" | "signup" | "check-status";
 
-interface Department {
-  _id: string;
-  name: string;
-  code: string;
-}
-
 const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -31,7 +25,6 @@ const Auth = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [departments, setDepartments] = useState<Department[]>([]);
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
   const [statusCheck, setStatusCheck] = useState<{
     status: string;
@@ -54,19 +47,6 @@ const Auth = () => {
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
-
-  // Fetch departments on mount
-  useEffect(() => {
-    const fetchDepartments = async () => {
-      try {
-        const response = await api.get('/departments');
-        setDepartments(response.data.data.departments);
-      } catch (error) {
-        console.error('Error fetching departments:', error);
-      }
-    };
-    fetchDepartments();
-  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -625,9 +605,12 @@ const Auth = () => {
                         className={`flex h-11 w-full rounded-xl border-2 border-border bg-background pl-12 pr-4 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:border-primary/50 transition-all duration-200 appearance-none cursor-pointer ${errors.department ? 'border-destructive' : ''}`}
                       >
                         <option value="">Select...</option>
-                        {departments.map(dept => (
-                          <option key={dept._id} value={dept._id}>{dept.name}</option>
-                        ))}
+                        <option value="calling agent">Calling Agent</option>
+                        <option value="closure">Closure</option>
+                        <option value="developer">Developer</option>
+                        <option value="SEO">SEO</option>
+                        <option value="PPC">PPC</option>
+                        <option value="Manager">Manager</option>
                       </select>
                     </div>
                     {errors.department && <p className="text-xs text-destructive">{errors.department}</p>}
@@ -644,18 +627,10 @@ const Auth = () => {
                         className={`flex h-11 w-full rounded-xl border-2 border-border bg-background pl-12 pr-4 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:border-primary/50 transition-all duration-200 appearance-none cursor-pointer ${errors.designation ? 'border-destructive' : ''}`}
                       >
                         <option value="">Select...</option>
-                        <option value="Manager">Manager</option>
-                        <option value="Assistant Manager">Assistant Manager</option>
-                        <option value="Accountant">Accountant</option>
-                        <option value="PA to Chairman">PA to Chairman</option>
-                        <option value="Executive">Executive</option>
-                        <option value="Senior Executive">Senior Executive</option>
-                        <option value="Team Lead">Team Lead</option>
-                        <option value="Developer">Developer</option>
-                        <option value="Designer">Designer</option>
-                        <option value="Analyst">Analyst</option>
+                        <option value="Probation">Probation</option>
+                        <option value="Senior">Senior</option>
+                        <option value="Junior">Junior</option>
                         <option value="Intern">Intern</option>
-                        <option value="Other">Other</option>
                       </select>
                     </div>
                     {errors.designation && <p className="text-xs text-destructive">{errors.designation}</p>}
