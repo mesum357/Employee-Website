@@ -8,11 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
 import { employeeAPI, leaveAPI } from "@/lib/api";
-import { 
+import {
   User,
-  Mail, 
-  Phone, 
-  MapPin, 
+  Mail,
+  Phone,
+  MapPin,
   Building,
   Calendar,
   FileText,
@@ -25,8 +25,18 @@ import {
   Loader2,
   AlertCircle,
   Save,
-  X
+  X,
+  Plus
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { FingerprintSettings } from "@/components/profile/FingerprintSettings";
@@ -85,7 +95,7 @@ const Profile = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [profile, setProfile] = useState<EmployeeProfile | null>(null);
   const [leaveBalances, setLeaveBalances] = useState<any>(null);
-  
+
   // Form state
   const [formData, setFormData] = useState({
     phone: "",
@@ -105,6 +115,12 @@ const Profile = () => {
   });
   const [newSkill, setNewSkill] = useState("");
 
+  // Document upload state
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [docName, setDocName] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
   // Fetch profile data
   useEffect(() => {
     fetchProfile();
@@ -117,7 +133,7 @@ const Profile = () => {
       setError(null);
       const response = await employeeAPI.getProfile();
       const employeeData = response.data.data.user.employee;
-      
+
       if (employeeData) {
         setProfile(employeeData);
         setFormData({
@@ -161,21 +177,21 @@ const Profile = () => {
 
   const handleSave = async () => {
     if (!profile) return;
-    
+
     try {
       setSaving(true);
       setError(null);
-      
+
       await employeeAPI.updateProfile(profile._id, {
         phone: formData.phone,
         address: formData.address,
         emergencyContact: formData.emergencyContact,
         skills: formData.skills
       });
-      
+
       // Refresh profile data
       await fetchProfile();
-      
+
       setIsEditing(false);
       toast({
         title: "Success",
@@ -234,16 +250,50 @@ const Profile = () => {
     });
   };
 
+  const handleDocumentUpload = async () => {
+    if (!profile || !selectedFile) return;
+
+    try {
+      setUploading(true);
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('name', docName || selectedFile.name);
+
+      await employeeAPI.uploadDocument(profile._id, formData);
+
+      toast({
+        title: "Success",
+        description: "Document uploaded successfully"
+      });
+
+      setUploadDialogOpen(false);
+      setDocName("");
+      setSelectedFile(null);
+
+      // Refresh profile to show new document
+      await fetchProfile();
+    } catch (err: any) {
+      console.error('Error uploading document:', err);
+      toast({
+        title: "Error",
+        description: err.response?.data?.message || "Failed to upload document",
+        variant: "destructive"
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const getAvatarInitials = (firstName: string, lastName: string) => {
     return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
   };
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return "N/A";
-    return new Date(dateString).toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
     });
   };
 
@@ -279,31 +329,31 @@ const Profile = () => {
     );
   }
 
-  const managerName = profile.manager 
+  const managerName = profile.manager
     ? `${profile.manager.firstName || ''} ${profile.manager.lastName || ''}`.trim()
     : "N/A";
 
   const leaveBalanceList = leaveBalances ? [
-    { 
-      type: "Annual Leave", 
-      total: leaveBalances.annual?.total || 0, 
+    {
+      type: "Annual Leave",
+      total: leaveBalances.annual?.total || 0,
       used: leaveBalances.annual?.used || 0,
       remaining: leaveBalances.annual?.remaining || 0,
-      icon: Briefcase 
+      icon: Briefcase
     },
-    { 
-      type: "Sick Leave", 
-      total: leaveBalances.sick?.total || 0, 
+    {
+      type: "Sick Leave",
+      total: leaveBalances.sick?.total || 0,
       used: leaveBalances.sick?.used || 0,
       remaining: leaveBalances.sick?.remaining || 0,
-      icon: Heart 
+      icon: Heart
     },
-    { 
-      type: "Casual Leave", 
-      total: leaveBalances.casual?.total || 0, 
+    {
+      type: "Casual Leave",
+      total: leaveBalances.casual?.total || 0,
       used: leaveBalances.casual?.used || 0,
       remaining: leaveBalances.casual?.remaining || 0,
-      icon: Calendar 
+      icon: Calendar
     },
   ] : [];
 
@@ -317,8 +367,8 @@ const Profile = () => {
             <div className="relative">
               <div className="w-32 h-32 rounded-2xl bg-card border-4 border-card flex items-center justify-center shadow-lg">
                 {profile.avatar ? (
-                  <img 
-                    src={profile.avatar} 
+                  <img
+                    src={profile.avatar}
                     alt={`${profile.firstName} ${profile.lastName}`}
                     className="w-full h-full object-cover rounded-2xl"
                   />
@@ -355,7 +405,7 @@ const Profile = () => {
                 <div className="flex gap-2">
                   {isEditing ? (
                     <>
-                      <Button 
+                      <Button
                         variant="outline"
                         onClick={handleCancel}
                         disabled={saving}
@@ -364,7 +414,7 @@ const Profile = () => {
                         <X className="w-4 h-4" />
                         Cancel
                       </Button>
-                      <Button 
+                      <Button
                         onClick={handleSave}
                         disabled={saving}
                         className="gap-2"
@@ -378,8 +428,8 @@ const Profile = () => {
                       </Button>
                     </>
                   ) : (
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="gap-2"
                       onClick={() => setIsEditing(true)}
                     >
@@ -429,7 +479,7 @@ const Profile = () => {
                     <div className="flex items-center gap-3 p-3 rounded-xl bg-secondary/50">
                       <Phone className="w-5 h-5 text-muted-foreground" />
                       {isEditing ? (
-                        <Input 
+                        <Input
                           value={formData.phone}
                           onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                           className="border-0 bg-transparent p-0 h-auto"
@@ -444,7 +494,7 @@ const Profile = () => {
                     <Label>Address</Label>
                     {isEditing ? (
                       <div className="space-y-3 p-3 rounded-xl bg-secondary/50">
-                        <Input 
+                        <Input
                           placeholder="Street Address"
                           value={formData.address.street}
                           onChange={(e) => setFormData({
@@ -453,7 +503,7 @@ const Profile = () => {
                           })}
                         />
                         <div className="grid grid-cols-2 gap-3">
-                          <Input 
+                          <Input
                             placeholder="City"
                             value={formData.address.city}
                             onChange={(e) => setFormData({
@@ -461,7 +511,7 @@ const Profile = () => {
                               address: { ...formData.address, city: e.target.value }
                             })}
                           />
-                          <Input 
+                          <Input
                             placeholder="State"
                             value={formData.address.state}
                             onChange={(e) => setFormData({
@@ -471,7 +521,7 @@ const Profile = () => {
                           />
                         </div>
                         <div className="grid grid-cols-2 gap-3">
-                          <Input 
+                          <Input
                             placeholder="Zip Code"
                             value={formData.address.zipCode}
                             onChange={(e) => setFormData({
@@ -479,7 +529,7 @@ const Profile = () => {
                               address: { ...formData.address, zipCode: e.target.value }
                             })}
                           />
-                          <Input 
+                          <Input
                             placeholder="Country"
                             value={formData.address.country}
                             onChange={(e) => setFormData({
@@ -505,7 +555,7 @@ const Profile = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Name</Label>
-                      <Input 
+                      <Input
                         value={formData.emergencyContact.name}
                         onChange={(e) => setFormData({
                           ...formData,
@@ -516,7 +566,7 @@ const Profile = () => {
                     </div>
                     <div className="space-y-2">
                       <Label>Relation</Label>
-                      <Input 
+                      <Input
                         value={formData.emergencyContact.relation}
                         onChange={(e) => setFormData({
                           ...formData,
@@ -527,7 +577,7 @@ const Profile = () => {
                     </div>
                     <div className="space-y-2 md:col-span-2">
                       <Label>Phone</Label>
-                      <Input 
+                      <Input
                         value={formData.emergencyContact.phone}
                         onChange={(e) => setFormData({
                           ...formData,
@@ -604,15 +654,72 @@ const Profile = () => {
               <Card className="dashboard-card">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-h5 text-foreground">My Documents</h3>
-                  <Button variant="outline" className="gap-2">
-                    <Upload className="w-4 h-4" />
-                    Upload
-                  </Button>
+                  <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="gap-2">
+                        <Upload className="w-4 h-4" />
+                        Upload
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Upload Document</DialogTitle>
+                        <DialogDescription>
+                          Add a new document to your profile. Allowed formats: PDF and images.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="docName">Document Name</Label>
+                          <Input
+                            id="docName"
+                            placeholder="e.g., CNIC, Degree"
+                            value={docName}
+                            onChange={(e) => setDocName(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="file">File</Label>
+                          <Input
+                            id="file"
+                            type="file"
+                            accept=".pdf,image/*"
+                            onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button
+                          variant="outline"
+                          onClick={() => setUploadDialogOpen(false)}
+                          disabled={uploading}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={handleDocumentUpload}
+                          disabled={uploading || !selectedFile}
+                        >
+                          {uploading ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Uploading...
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-4 h-4 mr-2" />
+                              Upload
+                            </>
+                          )}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </div>
                 {profile.documents && profile.documents.length > 0 ? (
                   <div className="space-y-3">
                     {profile.documents.map((doc, index) => (
-                      <div 
+                      <div
                         key={index}
                         className="flex items-center justify-between p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors"
                       >
@@ -627,7 +734,7 @@ const Profile = () => {
                             </p>
                           </div>
                         </div>
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" onClick={() => window.open(doc.url, '_blank')}>
                           <Download className="w-5 h-5" />
                         </Button>
                       </div>
@@ -691,10 +798,10 @@ const Profile = () => {
                       </span>
                     </div>
                     <div className="w-full bg-secondary rounded-full h-2">
-                      <div 
+                      <div
                         className="bg-primary h-2 rounded-full transition-all duration-500"
-                        style={{ 
-                          width: `${leave.total > 0 ? (leave.remaining / leave.total) * 100 : 0}%` 
+                        style={{
+                          width: `${leave.total > 0 ? (leave.remaining / leave.total) * 100 : 0}%`
                         }}
                       />
                     </div>

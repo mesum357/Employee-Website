@@ -77,6 +77,12 @@ export const employeeAPI = {
     api.put(`/employees/${id}`, data),
   getDirectory: () =>
     api.get('/employees/directory'),
+  uploadDocument: (id: string, formData: FormData) =>
+    api.post(`/employees/${id}/documents`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }),
 };
 
 // Attendance API
