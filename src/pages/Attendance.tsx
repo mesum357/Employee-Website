@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { 
-  MapPin, 
-  Check, 
+import {
+  MapPin,
+  Check,
   Clock,
   Calendar,
   ArrowRight,
@@ -93,11 +93,11 @@ const Attendance = () => {
       // Fetch today's status
       const todayResponse = await attendanceAPI.getToday();
       const todayData: TodayStatus = todayResponse.data.data;
-      
+
       setIsClockedIn(todayData.isCheckedIn);
       setIsClockedOut(todayData.isCheckedOut);
       setTodayAttendance(todayData.attendance);
-      
+
       // Check for active break from API response
       if (todayData.isOnBreak && todayData.activeBreak) {
         setIsOnBreak(true);
@@ -117,7 +117,7 @@ const Attendance = () => {
           setBreakStartTime(null);
         }
       }
-      
+
       if (todayData.attendance?.checkIn?.time) {
         setClockInTime(new Date(todayData.attendance.checkIn.time).toLocaleTimeString('en-US', {
           hour: '2-digit',
@@ -131,7 +131,7 @@ const Attendance = () => {
       const year = currentMonth.getFullYear();
       const myAttendanceResponse = await attendanceAPI.getMy(month, year);
       const attendanceData = myAttendanceResponse.data.data.attendance || [];
-      
+
       setPunchHistory(attendanceData);
       setMonthlyAttendance(attendanceData);
 
@@ -147,9 +147,9 @@ const Attendance = () => {
     try {
       setActionLoading(true);
       setError(null);
-      
+
       const response = await attendanceAPI.checkIn();
-      
+
       if (response.data.success) {
         setIsClockedIn(true);
         setTodayAttendance(response.data.data.attendance);
@@ -173,14 +173,14 @@ const Attendance = () => {
     try {
       setActionLoading(true);
       setError(null);
-      
+
       // End break if active before clocking out
       if (isOnBreak) {
         await attendanceAPI.endBreak();
       }
-      
+
       const response = await attendanceAPI.checkOut();
-      
+
       if (response.data.success) {
         setIsClockedOut(true);
         setIsOnBreak(false);
@@ -201,9 +201,9 @@ const Attendance = () => {
     try {
       setActionLoading(true);
       setError(null);
-      
+
       const response = await attendanceAPI.startBreak(reason);
-      
+
       if (response.data.success) {
         setIsOnBreak(true);
         setActiveBreak(response.data.data.activeBreak);
@@ -225,9 +225,9 @@ const Attendance = () => {
     try {
       setActionLoading(true);
       setError(null);
-      
+
       const response = await attendanceAPI.endBreak();
-      
+
       if (response.data.success) {
         setIsOnBreak(false);
         setActiveBreak(null);
@@ -246,20 +246,20 @@ const Attendance = () => {
   };
 
   const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-US', { 
-      hour: '2-digit', 
-      minute: '2-digit', 
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
       second: '2-digit',
-      hour12: true 
+      hour12: true
     });
   };
 
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', { 
+    return date.toLocaleDateString('en-US', {
       weekday: 'long',
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
     });
   };
 
@@ -291,6 +291,12 @@ const Attendance = () => {
   };
 
   const getStatusBadge = (record: AttendanceRecord) => {
+    const recordDate = new Date(record.date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    recordDate.setHours(0, 0, 0, 0);
+    const isPastDay = recordDate < today;
+
     if (record.checkOut?.time) {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-success-light text-success">
@@ -300,6 +306,16 @@ const Attendance = () => {
       );
     }
     if (record.checkIn?.time) {
+      // If day has passed and no checkout, show Incomplete
+      if (isPastDay) {
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-destructive/10 text-destructive">
+            <AlertCircle className="w-3 h-3" />
+            Incomplete
+          </span>
+        );
+      }
+      // Still today, show In Progress
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-warning/10 text-warning">
           <Clock className="w-3 h-3" />
@@ -307,6 +323,7 @@ const Attendance = () => {
         </span>
       );
     }
+    // No clock in at all
     return (
       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-destructive/10 text-destructive">
         Absent
@@ -317,14 +334,14 @@ const Attendance = () => {
   // Calculate worked time since clock in (excluding breaks)
   const getWorkedTime = () => {
     if (!todayAttendance?.checkIn?.time) return null;
-    
+
     const checkInTime = new Date(todayAttendance.checkIn.time);
-    const endTime = todayAttendance.checkOut?.time 
-      ? new Date(todayAttendance.checkOut.time) 
+    const endTime = todayAttendance.checkOut?.time
+      ? new Date(todayAttendance.checkOut.time)
       : new Date();
-    
+
     let totalBreakMs = 0;
-    
+
     // Calculate total break time
     if (todayAttendance.breaks && todayAttendance.breaks.length > 0) {
       todayAttendance.breaks.forEach((breakItem: Break) => {
@@ -339,23 +356,23 @@ const Attendance = () => {
         }
       });
     }
-    
+
     const diffMs = endTime.getTime() - checkInTime.getTime() - totalBreakMs;
     const hours = Math.floor(diffMs / (1000 * 60 * 60));
     const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-    
+
     return `${hours}h ${minutes}m`;
   };
 
   // Calculate break duration
   const getBreakDuration = () => {
     if (!isOnBreak || !breakStartTime) return null;
-    
+
     const diffMs = new Date().getTime() - breakStartTime.getTime();
     const minutes = Math.floor(diffMs / (1000 * 60));
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
-    
+
     if (hours > 0) {
       return `${hours}h ${mins}m`;
     }
@@ -389,9 +406,9 @@ const Attendance = () => {
   const { firstDay, daysInMonth } = getDaysInMonth();
   const isToday = (day: number) => {
     const today = new Date();
-    return today.getDate() === day && 
-           today.getMonth() === currentMonth.getMonth() && 
-           today.getFullYear() === currentMonth.getFullYear();
+    return today.getDate() === day &&
+      today.getMonth() === currentMonth.getMonth() &&
+      today.getFullYear() === currentMonth.getFullYear();
   };
 
   if (loading) {
@@ -432,21 +449,21 @@ const Attendance = () => {
           <div className={cn(
             "flex items-center gap-2 px-4 py-2 rounded-full mb-8",
             isClockedIn && !isClockedOut
-              ? "bg-success-light text-success" 
+              ? "bg-success-light text-success"
               : isClockedOut
-              ? "bg-muted text-muted-foreground"
-              : "bg-muted text-muted-foreground"
+                ? "bg-muted text-muted-foreground"
+                : "bg-muted text-muted-foreground"
           )}>
             <div className={cn(
               "w-2 h-2 rounded-full",
               isClockedIn && !isClockedOut ? "bg-success animate-pulse" : "bg-muted-foreground"
             )} />
             <span className="font-medium text-sm">
-              {isClockedOut 
-                ? "Clocked Out for Today" 
-                : isClockedIn 
-                ? "Currently Clocked In" 
-                : "Not Clocked In"}
+              {isClockedOut
+                ? "Clocked Out for Today"
+                : isClockedIn
+                  ? "Currently Clocked In"
+                  : "Not Clocked In"}
             </span>
           </div>
 
@@ -559,9 +576,9 @@ const Attendance = () => {
                   On break: <span className="font-medium">{getBreakDuration()}</span>
                   {activeBreak?.reason && (
                     <span className="ml-1">
-                      ({activeBreak.reason === 'washroom' ? 'Washroom' : 
-                        activeBreak.reason === 'lunch' ? 'Lunch' : 
-                        activeBreak.reason === 'cigarette' ? 'Cigarette' : 'Break'})
+                      ({activeBreak.reason === 'washroom' ? 'Washroom' :
+                        activeBreak.reason === 'lunch' ? 'Lunch' :
+                          activeBreak.reason === 'cigarette' ? 'Cigarette' : 'Break'})
                     </span>
                   )}
                 </p>
@@ -606,9 +623,9 @@ const Attendance = () => {
               const isWeekend = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day).getDay() % 6 === 0;
               const hasCheckIn = dayAttendance?.checkIn?.time;
               const hasCheckOut = dayAttendance?.checkOut?.time;
-              
+
               return (
-                <div 
+                <div
                   key={day}
                   className={cn(
                     "aspect-square flex items-center justify-center rounded-lg text-sm font-medium transition-colors cursor-pointer hover:bg-secondary",
@@ -673,8 +690,8 @@ const Attendance = () => {
                 </tr>
               ) : (
                 punchHistory.map((record) => (
-                  <tr 
-                    key={record._id} 
+                  <tr
+                    key={record._id}
                     className="border-b border-border/50 hover:bg-secondary/50 transition-colors"
                   >
                     <td className="py-4 px-4 font-medium text-foreground">
