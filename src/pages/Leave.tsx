@@ -20,12 +20,12 @@ import {
 } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { 
-  Calendar as CalendarIcon, 
-  Plus, 
-  Clock, 
-  CheckCircle2, 
-  XCircle, 
+import {
+  Calendar as CalendarIcon,
+  Plus,
+  Clock,
+  CheckCircle2,
+  XCircle,
   AlertCircle,
   FileUp,
   Briefcase,
@@ -51,10 +51,10 @@ interface LeaveBalance {
 
 interface LeaveBalanceData {
   balance: LeaveBalance; // Total/limit from policies
-  used: LeaveBalance; // Used this month
-  remaining: LeaveBalance; // Remaining this month
+  used: LeaveBalance; // Used this year
+  remaining: LeaveBalance; // Remaining this year
   totals: LeaveBalance; // Same as balance for backward compatibility
-  policies?: Array<{ leaveType: string; monthlyLimit: number }>;
+  policies?: Array<{ leaveType: string; yearlyLimit: number }>;
 }
 
 interface LeaveRecord {
@@ -124,11 +124,11 @@ const Leave = () => {
       ]);
 
       setLeaveHistory(myLeavesResponse.data.data.leaves || []);
-      
+
       // Update balance, used, and remaining from backend response
       if (balanceResponse.data.data) {
         const balanceData: LeaveBalanceData = balanceResponse.data.data;
-        
+
         if (balanceData.balance) {
           setLeaveBalance(balanceData.balance);
         }
@@ -190,7 +190,7 @@ const Leave = () => {
         setIsPartialDay(false);
         // Refresh data
         fetchLeaveData();
-        
+
         // Clear success message after 3 seconds
         setTimeout(() => setSuccessMessage(null), 3000);
       }
@@ -251,12 +251,12 @@ const Leave = () => {
   };
 
   const getLeaveTypeUsed = (type: string) => {
-    // Returns used days for current month (from backend)
+    // Returns used days for current year (from backend)
     return leaveUsed[type as keyof LeaveBalance] || 0;
   };
 
   const getLeaveTypeRemaining = (type: string) => {
-    // Returns remaining days for current month (from backend)
+    // Returns remaining days for current year (from backend)
     return leaveRemaining[type as keyof LeaveBalance] || 0;
   };
 
@@ -313,13 +313,13 @@ const Leave = () => {
                 <Card className="p-4 bg-primary-light/50 border-primary/20">
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-foreground">Monthly Limit (from HR Policy)</span>
+                      <span className="text-sm text-foreground">Yearly Limit (from HR Policy)</span>
                       <span className="text-sm font-medium text-foreground">
                         {getLeaveTypeBalance(selectedType)} days
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-foreground">Used This Month</span>
+                      <span className="text-sm text-foreground">Used This Year</span>
                       <span className="text-sm font-medium text-foreground">
                         {getLeaveTypeUsed(selectedType)} days
                       </span>
@@ -381,8 +381,8 @@ const Leave = () => {
               {/* Reason */}
               <div className="space-y-2">
                 <Label>Reason *</Label>
-                <Textarea 
-                  placeholder="Briefly describe your reason for leave..." 
+                <Textarea
+                  placeholder="Briefly describe your reason for leave..."
                   rows={3}
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
@@ -395,7 +395,7 @@ const Leave = () => {
                 <div className="flex gap-3">
                   <AlertCircle className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                   <p className="text-small text-muted-foreground">
-                    Leave requests should be submitted at least 3 days in advance for annual leave. 
+                    Leave requests should be submitted at least 3 days in advance for annual leave.
                     Emergency sick leave can be requested on the same day.
                   </p>
                 </div>
@@ -407,9 +407,9 @@ const Leave = () => {
                 </div>
               )}
 
-              <Button 
-                className="w-full" 
-                size="lg" 
+              <Button
+                className="w-full"
+                size="lg"
                 onClick={handleSubmitLeave}
                 disabled={submitting || !selectedType || !startDate || !endDate || !reason.trim()}
               >
@@ -450,10 +450,10 @@ const Leave = () => {
           const used = getLeaveTypeUsed(type.id); // Used this month
           const remaining = getLeaveTypeRemaining(type.id); // Remaining this month (from backend)
           const Icon = type.icon;
-          
+
           return (
-            <Card 
-              key={type.id} 
+            <Card
+              key={type.id}
               className={cn(
                 "kpi-card animate-fade-up",
                 `delay-${(index + 1) * 100}`
@@ -470,10 +470,10 @@ const Leave = () => {
               </div>
               <p className="text-sm font-medium text-foreground mt-2">{type.name}</p>
               <p className="text-xs text-muted-foreground mt-1">
-                {used} days used this month
+                {used} days used this year
               </p>
               <div className="w-full bg-secondary rounded-full h-2 mt-2">
-                <div 
+                <div
                   className="bg-primary h-2 rounded-full transition-all duration-500"
                   style={{ width: `${balance > 0 ? (remaining / balance) * 100 : 0}%` }}
                 />
@@ -494,7 +494,7 @@ const Leave = () => {
             </div>
           ) : (
             leaveHistory.map((leave) => (
-              <div 
+              <div
                 key={leave._id}
                 className="flex items-center justify-between p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors"
               >
@@ -520,8 +520,8 @@ const Leave = () => {
                 <div className="flex items-center gap-3">
                   {getStatusBadge(leave.status)}
                   {leave.status === 'pending' && (
-                    <Button 
-                      variant="ghost" 
+                    <Button
+                      variant="ghost"
                       size="sm"
                       className="text-destructive hover:text-destructive"
                       onClick={() => handleCancelLeave(leave._id)}
