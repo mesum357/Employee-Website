@@ -1,13 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useLocation, Navigate } from "react-router-dom";
-import { 
-  LayoutDashboard, 
-  Clock, 
-  Calendar, 
-  MessageSquare, 
-  Users, 
-  FileText, 
-  Settings, 
+import {
+  LayoutDashboard,
+  Clock,
+  Calendar,
+  MessageSquare,
+  Users,
+  FileText,
+  Settings,
   Bell,
   Search,
   ChevronLeft,
@@ -49,7 +49,7 @@ const navigation = [
   { name: "Leave", href: "/leave", icon: Calendar },
   { name: "Notices", href: "/notices", icon: Megaphone },
   { name: "Meetings", href: "/meetings", icon: Video },
-  { name: "Report", href: "/report", icon: ClipboardList },
+  { name: "Report", href: "/report", icon: ClipboardList, managerOnly: true },
   { name: "Chat", href: "/chat", icon: MessageSquare },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
@@ -65,6 +65,23 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const { user, logout, isAuthenticated, isLoading } = useAuth();
   const isMobile = useIsMobile();
 
+  // Check if user is a manager (by department name)
+  const isManager = useMemo(() => {
+    const dept = user?.employee?.department;
+    if (!dept) return false;
+    // Handle both populated and non-populated department
+    const deptName = typeof dept === 'object' ? dept.name : dept;
+    return deptName?.toLowerCase() === 'manager';
+  }, [user?.employee?.department]);
+
+  // Filter navigation based on user role
+  const filteredNavigation = useMemo(() => {
+    return navigation.filter(item => {
+      if (item.managerOnly && !isManager) return false;
+      return true;
+    });
+  }, [isManager]);
+
   useEffect(() => {
     if (isAuthenticated && user) {
       fetchPendingTasks();
@@ -76,19 +93,19 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         fetchUnreadNotices();
         fetchUnreadMessages();
       }, 30000);
-      
+
       // Listen for refresh events from notices page
       const handleRefresh = () => {
         fetchUnreadNotices();
       };
       window.addEventListener('refreshUnreadNotices', handleRefresh);
-      
+
       // Listen for refresh events from chat page
       const handleChatRefresh = () => {
         fetchUnreadMessages();
       };
       window.addEventListener('refreshUnreadMessages', handleChatRefresh);
-      
+
       return () => {
         clearInterval(interval);
         window.removeEventListener('refreshUnreadNotices', handleRefresh);
@@ -114,7 +131,7 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       const response = await noticeAPI.getAll({ isActive: true });
       const notices = response.data.data.notices || [];
       const userId = user?.id;
-      
+
       // Count notices that haven't been read by current user
       const unreadCount = notices.filter((notice: any) => {
         if (!notice.readBy || notice.readBy.length === 0) return true;
@@ -123,7 +140,7 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
           return readUserId?.toString() === userId?.toString();
         });
       }).length;
-      
+
       setUnreadNoticesCount(unreadCount);
     } catch (error) {
       // Silently fail - notices might not be available
@@ -134,12 +151,12 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     try {
       const response = await chatAPI.getAll();
       const chats = response.data.data.chats || [];
-      
+
       // Sum up unread counts from all chats
       const totalUnread = chats.reduce((sum: number, chat: any) => {
         return sum + (chat.unreadCount || 0);
       }, 0);
-      
+
       setUnreadMessagesCount(totalUnread);
     } catch (error) {
       // Silently fail - chat might not be available
@@ -190,12 +207,12 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
 
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-        {navigation.map((item) => {
+        {filteredNavigation.map((item) => {
           const showChatBadge = item.name === 'Chat' && unreadMessagesCount > 0;
           const showNoticesBadge = item.name === 'Notices' && unreadNoticesCount > 0;
           const showBadge = showChatBadge || showNoticesBadge;
           const badgeCount = item.name === 'Chat' ? unreadMessagesCount : unreadNoticesCount;
-          
+
           return (
             <button
               key={item.name}
@@ -299,7 +316,7 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   return (
     <div className="min-h-screen flex bg-background">
       {/* Desktop Sidebar - hidden on mobile/tablet */}
-      <aside 
+      <aside
         className={cn(
           "hidden lg:flex fixed left-0 top-0 h-full bg-sidebar transition-all duration-300 z-50 flex-col",
           collapsed ? "w-20" : "w-64"
@@ -338,16 +355,16 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
 
           <div className="relative flex-1 max-w-xs hidden sm:block">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-            <Input 
-              placeholder="Search anything..." 
+            <Input
+              placeholder="Search anything..."
               className="pl-12 bg-secondary/50 border-transparent focus-visible:border-primary/50"
             />
           </div>
 
           <div className="flex items-center gap-2 sm:gap-4">
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               className="relative"
               onClick={() => {
                 const event = new CustomEvent('openTasks');
@@ -362,9 +379,9 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
                 </Badge>
               )}
             </Button>
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               className="relative"
               onClick={() => {
                 navigate("/notices");
@@ -378,7 +395,7 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
                 </Badge>
               )}
             </Button>
-            <button 
+            <button
               onClick={() => navigate("/profile")}
               className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center cursor-pointer hover:bg-primary/20 transition-colors"
             >

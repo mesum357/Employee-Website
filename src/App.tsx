@@ -32,6 +32,30 @@ const ProtectedPage = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
+// Manager-only page wrapper - redirects non-managers to dashboard
+const ManagerOnlyPage = ({ children }: { children: React.ReactNode }) => {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return null;
+  }
+
+  // Check if user's department is "Manager"
+  const dept = user?.employee?.department;
+  const deptName = typeof dept === 'object' ? dept?.name : dept;
+  const isManager = deptName?.toLowerCase() === 'manager';
+
+  if (!isManager) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return (
+    <DashboardLayout>
+      {children}
+    </DashboardLayout>
+  );
+};
+
 // Root redirect based on auth status
 const RootRedirect = () => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -77,7 +101,7 @@ const AppRoutes = () => (
     <Route path="/notices" element={<ProtectedPage><Notices /></ProtectedPage>} />
     <Route path="/meetings" element={<ProtectedPage><Meetings /></ProtectedPage>} />
     <Route path="/chat" element={<ProtectedPage><Chat /></ProtectedPage>} />
-    <Route path="/report" element={<ProtectedPage><Report /></ProtectedPage>} />
+    <Route path="/report" element={<ManagerOnlyPage><Report /></ManagerOnlyPage>} />
     <Route path="/settings" element={<ProtectedPage><Settings /></ProtectedPage>} />
     <Route path="/profile" element={<ProtectedPage><Profile /></ProtectedPage>} />
 
