@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { TasksPopup } from "@/components/TasksPopup";
+import { NotificationProvider } from "@/components/notifications/NotificationProvider";
 
 // Pages
 import Auth from "./pages/Auth";
@@ -34,30 +35,30 @@ const ProtectedPage = ({ children }: { children: React.ReactNode }) => {
 // Root redirect based on auth status
 const RootRedirect = () => {
   const { isAuthenticated, isLoading } = useAuth();
-  
+
   if (isLoading) {
     return null;
   }
-  
+
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />;
   }
-  
+
   return <Navigate to="/auth" replace />;
 };
 
 // Auth page wrapper - redirect if already logged in
 const AuthPageWrapper = () => {
   const { isAuthenticated, isLoading } = useAuth();
-  
+
   if (isLoading) {
     return null;
   }
-  
+
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />;
   }
-  
+
   return <Auth />;
 };
 
@@ -65,10 +66,10 @@ const AppRoutes = () => (
   <Routes>
     {/* Root redirect */}
     <Route path="/" element={<RootRedirect />} />
-    
+
     {/* Auth route - public but redirects if logged in */}
     <Route path="/auth" element={<AuthPageWrapper />} />
-    
+
     {/* Protected routes with dashboard layout */}
     <Route path="/dashboard" element={<ProtectedPage><Dashboard /></ProtectedPage>} />
     <Route path="/attendance" element={<ProtectedPage><Attendance /></ProtectedPage>} />
@@ -79,7 +80,7 @@ const AppRoutes = () => (
     <Route path="/report" element={<ProtectedPage><Report /></ProtectedPage>} />
     <Route path="/settings" element={<ProtectedPage><Settings /></ProtectedPage>} />
     <Route path="/profile" element={<ProtectedPage><Profile /></ProtectedPage>} />
-    
+
     {/* 404 */}
     <Route path="*" element={<NotFound />} />
   </Routes>
@@ -92,8 +93,10 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-          <AppRoutes />
-          <TasksPopup />
+          <NotificationProvider>
+            <AppRoutes />
+            <TasksPopup />
+          </NotificationProvider>
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>
