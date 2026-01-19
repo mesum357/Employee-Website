@@ -620,13 +620,21 @@ const Auth = () => {
                         className={`flex h-11 w-full rounded-xl border-2 border-border bg-background pl-12 pr-4 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:border-primary/50 transition-all duration-200 appearance-none cursor-pointer ${errors.department ? 'border-destructive' : ''}`}
                       >
                         <option value="">Select...</option>
-                        <option value="Manager">Manager</option>
-                        <option value="HR">HR</option>
-                        <option value="Agent">Agent</option>
-                        <option value="Closer">Closer</option>
-                        <option value="Developer">Developer</option>
-                        <option value="SEO Expert">SEO Expert</option>
-                        <option value="Intern">Intern</option>
+                        {departments.length > 0 ? (
+                          departments.map((dept) => (
+                            <option key={dept._id} value={dept._id}>{dept.name}</option>
+                          ))
+                        ) : (
+                          <>
+                            <option value="Manager">Manager</option>
+                            <option value="HR">HR</option>
+                            <option value="Agent">Agent</option>
+                            <option value="Closer">Closer</option>
+                            <option value="Developer">Developer</option>
+                            <option value="SEO Expert">SEO Expert</option>
+                            <option value="Intern">Intern</option>
+                          </>
+                        )}
                       </select>
                     </div>
                     {errors.department && <p className="text-xs text-destructive">{errors.department}</p>}
