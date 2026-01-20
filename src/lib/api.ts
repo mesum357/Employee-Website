@@ -226,6 +226,13 @@ export const reportAPI = {
     api.get('/reports/dashboard'),
   getEmployeeReport: (id: string) =>
     api.get(`/reports/employee/${id}`),
+  // Manager-only methods
+  getEmployeeTodayReport: (employeeId: string) =>
+    api.get(`/reports/employee/${employeeId}/today`),
+  updateEmployeeReport: (employeeId: string, data: { headset: number; sales: number }) =>
+    api.post(`/reports/employee/${employeeId}`, data),
+  getEmployees: () =>
+    api.get('/employees/directory'),
 };
 
 // Settings/Profile API

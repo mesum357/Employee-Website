@@ -606,9 +606,9 @@ const Dashboard = () => {
                       </div>
                       {/* Show resolution notes for resolved tickets */}
                       {(ticket.status === 'resolved' || ticket.status === 'closed') && ticket.resolutionNotes && (
-                        <div className="mt-3 p-3 rounded-lg bg-success/10 border border-success/20">
+                        <div className="mt-3 p-3 rounded-lg bg-success/10 border border-success/20 overflow-hidden">
                           <p className="text-xs font-medium text-success mb-1">Admin Response:</p>
-                          <p className="text-sm text-foreground">{ticket.resolutionNotes}</p>
+                          <p className="text-sm text-foreground break-words whitespace-pre-wrap">{ticket.resolutionNotes}</p>
                         </div>
                       )}
                     </div>
