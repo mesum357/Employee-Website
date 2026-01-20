@@ -629,7 +629,7 @@ const Auth = () => {
                             <option value="Manager">Manager</option>
                             <option value="HR">HR</option>
                             <option value="Agent">Agent</option>
-                            <option value="Closer">Closer</option>
+                            <option value="Closure">Closure</option>
                             <option value="Developer">Developer</option>
                             <option value="SEO Expert">SEO Expert</option>
                             <option value="Intern">Intern</option>
