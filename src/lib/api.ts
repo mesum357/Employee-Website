@@ -233,6 +233,8 @@ export const reportAPI = {
     api.post(`/reports/employee/${employeeId}`, data),
   getEmployees: () =>
     api.get('/employees/directory'),
+  getManagerUpdatedReports: (params?: any) =>
+    api.get('/reports/manager/updated', { params }),
 };
 
 // Settings/Profile API
