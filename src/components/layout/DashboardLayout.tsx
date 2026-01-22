@@ -194,12 +194,12 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       {/* Logo */}
       <div className="h-18 flex items-center px-6 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-sidebar-primary flex items-center justify-center flex-shrink-0">
-            <span className="text-lg font-bold text-sidebar-primary-foreground">CD</span>
+          <div className="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center flex-shrink-0">
+            <img src={mmhLogo} alt="MMH Logo" className="w-full h-full object-contain" />
           </div>
           {!collapsed && (
             <span className="text-lg font-bold text-sidebar-foreground whitespace-nowrap">
-              Cross DIGI
+              MMH Corporate
             </span>
           )}
         </div>
