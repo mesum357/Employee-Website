@@ -40,6 +40,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { FingerprintSettings } from "@/components/profile/FingerprintSettings";
+import profileBg from "@/assets/bg.png";
 
 interface EmployeeProfile {
   _id: string;
@@ -361,7 +362,10 @@ const Profile = () => {
     <div className="space-y-6">
       {/* Profile Header */}
       <Card className="dashboard-card overflow-hidden">
-        <div className="h-32 bg-gradient-to-r from-primary to-accent" />
+        <div
+          className="h-32 bg-cover bg-center"
+          style={{ backgroundImage: `url(${profileBg})` }}
+        />
         <div className="px-6 pb-6">
           <div className="flex flex-col md:flex-row md:items-end gap-4 -mt-16">
             <div className="relative">
