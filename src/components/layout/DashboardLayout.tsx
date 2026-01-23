@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { taskAPI, noticeAPI, chatAPI } from "@/lib/api";
 import { useIsMobile } from "@/hooks/use-mobile";
+import mmhLogo from "@/assets/mmh-logo.png";
 import {
   Sheet,
   SheetContent,
