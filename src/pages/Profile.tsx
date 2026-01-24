@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
-import { employeeAPI, leaveAPI } from "@/lib/api";
+import { employeeAPI } from "@/lib/api";
 import {
   User,
   Mail,
@@ -95,7 +95,6 @@ const Profile = () => {
   const [error, setError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [profile, setProfile] = useState<EmployeeProfile | null>(null);
-  const [leaveBalances, setLeaveBalances] = useState<any>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -125,7 +124,6 @@ const Profile = () => {
   // Fetch profile data
   useEffect(() => {
     fetchProfile();
-    fetchLeaveBalance();
   }, []);
 
   const fetchProfile = async () => {
@@ -167,14 +165,7 @@ const Profile = () => {
     }
   };
 
-  const fetchLeaveBalance = async () => {
-    try {
-      const response = await leaveAPI.getBalance();
-      setLeaveBalances(response.data.data);
-    } catch (err: any) {
-      console.error('Error fetching leave balance:', err);
-    }
-  };
+
 
   const handleSave = async () => {
     if (!profile) return;
@@ -334,29 +325,7 @@ const Profile = () => {
     ? `${profile.manager.firstName || ''} ${profile.manager.lastName || ''}`.trim()
     : "N/A";
 
-  const leaveBalanceList = leaveBalances ? [
-    {
-      type: "Annual Leave",
-      total: leaveBalances.annual?.total || 0,
-      used: leaveBalances.annual?.used || 0,
-      remaining: leaveBalances.annual?.remaining || 0,
-      icon: Briefcase
-    },
-    {
-      type: "Sick Leave",
-      total: leaveBalances.sick?.total || 0,
-      used: leaveBalances.sick?.used || 0,
-      remaining: leaveBalances.sick?.remaining || 0,
-      icon: Heart
-    },
-    {
-      type: "Casual Leave",
-      total: leaveBalances.casual?.total || 0,
-      used: leaveBalances.casual?.used || 0,
-      remaining: leaveBalances.casual?.remaining || 0,
-      icon: Calendar
-    },
-  ] : [];
+
 
   return (
     <div className="space-y-6">
@@ -786,34 +755,7 @@ const Profile = () => {
             </div>
           </Card>
 
-          {leaveBalanceList.length > 0 && (
-            <Card className="dashboard-card">
-              <h3 className="text-h6 text-foreground mb-4">Leave Balance</h3>
-              <div className="space-y-4">
-                {leaveBalanceList.map((leave, index) => (
-                  <div key={index}>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <leave.icon className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-small text-foreground">{leave.type}</span>
-                      </div>
-                      <span className="text-caption">
-                        {leave.remaining}/{leave.total}
-                      </span>
-                    </div>
-                    <div className="w-full bg-secondary rounded-full h-2">
-                      <div
-                        className="bg-primary h-2 rounded-full transition-all duration-500"
-                        style={{
-                          width: `${leave.total > 0 ? (leave.remaining / leave.total) * 100 : 0}%`
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
+
 
           {managerName !== "N/A" && (
             <Card className="dashboard-card">
