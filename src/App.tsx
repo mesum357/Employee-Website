@@ -40,10 +40,9 @@ const ManagerOnlyPage = ({ children }: { children: React.ReactNode }) => {
     return null;
   }
 
-  // Check if user's department is "Manager"
-  const dept = user?.employee?.department;
-  const deptName = typeof dept === 'object' ? dept?.name : dept;
-  const isManager = deptName?.toLowerCase() === 'manager';
+  // Check if user's designation is "Manager"
+  const designation = user?.employee?.designation;
+  const isManager = designation?.toLowerCase() === 'manager';
 
   if (!isManager) {
     return <Navigate to="/dashboard" replace />;

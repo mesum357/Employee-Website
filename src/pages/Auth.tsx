@@ -66,7 +66,11 @@ const Auth = () => {
       try {
         const response = await api.get('/departments');
         if (response.data.success) {
-          setDepartments(response.data.data.departments);
+          const allDepts = response.data.data.departments;
+          const filtered = allDepts.filter((d: any) =>
+            ['backend', 'sales'].includes(d.name.toLowerCase())
+          );
+          setDepartments(filtered);
         }
       } catch (error) {
         console.error("Error fetching departments:", error);
@@ -393,21 +397,8 @@ const Auth = () => {
                       className={`flex h-11 w-full rounded-xl border-2 border-gray-300 bg-white/70 pl-12 pr-4 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:border-primary/50 transition-all duration-200 appearance-none cursor-pointer ${errors.department ? 'border-destructive' : ''}`}
                     >
                       <option value="">Select...</option>
-                      {departments.length > 0 ? (
-                        departments.map((dept) => (
-                          <option key={dept._id} value={dept._id}>{dept.name}</option>
-                        ))
-                      ) : (
-                        <>
-                          <option value="Manager">Manager</option>
-                          <option value="HR">HR</option>
-                          <option value="Agent">Agent</option>
-                          <option value="Closure">Closure</option>
-                          <option value="Developer">Developer</option>
-                          <option value="SEO Expert">SEO Expert</option>
-                          <option value="Intern">Intern</option>
-                        </>
-                      )}
+                      <option value="Backend">Backend</option>
+                      <option value="Sales">Sales</option>
                     </select>
                   </div>
                   {errors.department && <p className="text-xs text-red-600">{errors.department}</p>}
@@ -424,10 +415,16 @@ const Auth = () => {
                       className={`flex h-11 w-full rounded-xl border-2 border-gray-300 bg-white/70 pl-12 pr-4 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:border-primary/50 transition-all duration-200 appearance-none cursor-pointer ${errors.designation ? 'border-destructive' : ''}`}
                     >
                       <option value="">Select...</option>
+                      <option value="Manager">Manager</option>
+                      <option value="HR">HR</option>
+                      <option value="Agent">Agent</option>
+                      <option value="Closure">Closure</option>
+                      <option value="Developer">Developer</option>
+                      <option value="SEO Expert">SEO Expert</option>
+                      <option value="Intern">Intern</option>
                       <option value="Probation">Probation</option>
                       <option value="Senior">Senior</option>
                       <option value="Junior">Junior</option>
-                      <option value="Intern">Intern</option>
                     </select>
                   </div>
                   {errors.designation && <p className="text-xs text-red-600">{errors.designation}</p>}

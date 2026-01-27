@@ -4,6 +4,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -39,24 +40,6 @@ import { cn } from "@/lib/utils";
 import { leaveAPI } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 
-interface LeaveBalance {
-  annual: number;
-  sick: number;
-  casual: number;
-  unpaid: number;
-  maternity?: number;
-  paternity?: number;
-  other?: number;
-}
-
-interface LeaveBalanceData {
-  balance: LeaveBalance; // Total/limit from policies
-  used: LeaveBalance; // Used this year
-  remaining: LeaveBalance; // Remaining this year
-  totals: LeaveBalance; // Same as balance for backward compatibility
-  policies?: Array<{ leaveType: string; yearlyLimit: number }>;
-}
-
 interface LeaveRecord {
   _id: string;
   leaveType: string;
@@ -67,6 +50,7 @@ interface LeaveRecord {
   reason?: string;
   reviewerComments?: string;
   createdAt: string;
+  attachments?: Array<{ name: string; url: string }>;
 }
 
 const leaveTypeConfig = [
@@ -83,28 +67,11 @@ const Leave = () => {
   const [endDate, setEndDate] = useState<Date>();
   const [isPartialDay, setIsPartialDay] = useState(false);
   const [reason, setReason] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [leaveBalance, setLeaveBalance] = useState<LeaveBalance>({
-    annual: 0,
-    sick: 0,
-    casual: 0,
-    unpaid: 0
-  });
-  const [leaveUsed, setLeaveUsed] = useState<LeaveBalance>({
-    annual: 0,
-    sick: 0,
-    casual: 0,
-    unpaid: 0
-  });
-  const [leaveRemaining, setLeaveRemaining] = useState<LeaveBalance>({
-    annual: 0,
-    sick: 0,
-    casual: 0,
-    unpaid: 0
-  });
   const [leaveHistory, setLeaveHistory] = useState<LeaveRecord[]>([]);
   const [sheetOpen, setSheetOpen] = useState(false);
 
@@ -116,30 +83,8 @@ const Leave = () => {
     try {
       setLoading(true);
       setError(null);
-
-      // Fetch leave history and balance
-      const [myLeavesResponse, balanceResponse] = await Promise.all([
-        leaveAPI.getMy(),
-        leaveAPI.getBalance()
-      ]);
-
-      setLeaveHistory(myLeavesResponse.data.data.leaves || []);
-
-      // Update balance, used, and remaining from backend response
-      if (balanceResponse.data.data) {
-        const balanceData: LeaveBalanceData = balanceResponse.data.data;
-
-        if (balanceData.balance) {
-          setLeaveBalance(balanceData.balance);
-        }
-        if (balanceData.used) {
-          setLeaveUsed(balanceData.used);
-        }
-        if (balanceData.remaining) {
-          setLeaveRemaining(balanceData.remaining);
-        }
-      }
-
+      const response = await leaveAPI.getMy();
+      setLeaveHistory(response.data.data.leaves || []);
     } catch (err: any) {
       console.error('Error fetching leave data:', err);
       setError(err.response?.data?.message || 'Failed to load leave data');
@@ -154,7 +99,6 @@ const Leave = () => {
       return;
     }
 
-    // Reason is required by backend
     if (!reason || reason.trim() === '') {
       setError('Please provide a reason for your leave request');
       return;
@@ -164,20 +108,18 @@ const Leave = () => {
       setSubmitting(true);
       setError(null);
 
-      // Calculate total days
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      const diffTime = Math.abs(end.getTime() - start.getTime());
-      const totalDays = isPartialDay ? 0.5 : Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      const formData = new FormData();
+      formData.append('leaveType', selectedType);
+      formData.append('startDate', startDate.toISOString());
+      formData.append('endDate', endDate.toISOString());
+      formData.append('reason', reason.trim());
+      formData.append('isHalfDay', String(isPartialDay));
 
-      const response = await leaveAPI.create({
-        leaveType: selectedType,
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
-        totalDays,
-        reason: reason.trim(),
-        isHalfDay: isPartialDay
-      });
+      if (selectedFile) {
+        formData.append('image', selectedFile);
+      }
+
+      const response = await leaveAPI.create(formData);
 
       if (response.data.success) {
         setSuccessMessage('Leave request submitted successfully!');
@@ -188,10 +130,10 @@ const Leave = () => {
         setEndDate(undefined);
         setReason("");
         setIsPartialDay(false);
+        setSelectedFile(null);
         // Refresh data
         fetchLeaveData();
 
-        // Clear success message after 3 seconds
         setTimeout(() => setSuccessMessage(null), 3000);
       }
     } catch (err: any) {
@@ -245,21 +187,6 @@ const Leave = () => {
     });
   };
 
-  const getLeaveTypeBalance = (type: string) => {
-    // Returns total/limit from HR policies
-    return leaveBalance[type as keyof LeaveBalance] || 0;
-  };
-
-  const getLeaveTypeUsed = (type: string) => {
-    // Returns used days for current year (from backend)
-    return leaveUsed[type as keyof LeaveBalance] || 0;
-  };
-
-  const getLeaveTypeRemaining = (type: string) => {
-    // Returns remaining days for current year (from backend)
-    return leaveRemaining[type as keyof LeaveBalance] || 0;
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -274,7 +201,7 @@ const Leave = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-h2 text-foreground">Leave Management</h1>
-          <p className="text-muted-foreground mt-1">Request time off and track your leave balance</p>
+          <p className="text-muted-foreground mt-1">Request time off and track your leave history</p>
         </div>
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           <SheetTrigger asChild>
@@ -307,32 +234,6 @@ const Leave = () => {
                   </SelectContent>
                 </Select>
               </div>
-
-              {/* Balance Indicator */}
-              {selectedType && (
-                <Card className="p-4 bg-primary-light/50 border-primary/20">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-foreground">Yearly Limit (from HR Policy)</span>
-                      <span className="text-sm font-medium text-foreground">
-                        {getLeaveTypeBalance(selectedType)} days
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-foreground">Used This Year</span>
-                      <span className="text-sm font-medium text-foreground">
-                        {getLeaveTypeUsed(selectedType)} days
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between pt-2 border-t border-primary/20">
-                      <span className="text-sm font-medium text-foreground">Remaining Balance</span>
-                      <span className="text-h4 text-primary font-bold">
-                        {getLeaveTypeRemaining(selectedType)} days
-                      </span>
-                    </div>
-                  </div>
-                </Card>
-              )}
 
               {/* Date Selection */}
               <div className="grid grid-cols-2 gap-4">
@@ -390,6 +291,31 @@ const Leave = () => {
                 />
               </div>
 
+              {/* Image Upload */}
+              <div className="space-y-2">
+                <Label>Attachment (Optional)</Label>
+                <div className="flex flex-col gap-2">
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) setSelectedFile(file);
+                    }}
+                    className="cursor-pointer"
+                  />
+                  {selectedFile && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <FileUp className="w-3 h-3" />
+                      {selectedFile.name}
+                    </p>
+                  )}
+                  <p className="text-caption text-muted-foreground italic">
+                    Upload medical reports or any other supporting document images.
+                  </p>
+                </div>
+              </div>
+
               {/* Policy Reminder */}
               <Card className="p-4 bg-secondary/50">
                 <div className="flex gap-3">
@@ -429,7 +355,7 @@ const Leave = () => {
 
       {/* Success Message */}
       {successMessage && (
-        <div className="bg-success/10 border border-success/20 rounded-lg p-4 flex items-center gap-3">
+        <div className="bg-success/10 border border-success/20 rounded-lg p-4 flex items-center gap-3 animate-fade-in">
           <CheckCircle2 className="w-5 h-5 text-success" />
           <p className="text-success">{successMessage}</p>
         </div>
@@ -437,93 +363,76 @@ const Leave = () => {
 
       {/* Error Message */}
       {error && !sheetOpen && (
-        <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 flex items-center gap-3">
+        <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 flex items-center gap-3 animate-fade-in">
           <AlertCircle className="w-5 h-5 text-destructive" />
           <p className="text-destructive">{error}</p>
         </div>
       )}
 
-      {/* Leave Balance Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {leaveTypeConfig.map((type, index) => {
-          const balance = getLeaveTypeBalance(type.id); // Total/limit from HR policies
-          const used = getLeaveTypeUsed(type.id); // Used this month
-          const remaining = getLeaveTypeRemaining(type.id); // Remaining this month (from backend)
-          const Icon = type.icon;
-
-          return (
-            <Card
-              key={type.id}
-              className={cn(
-                "kpi-card animate-fade-up",
-                `delay-${(index + 1) * 100}`
-              )}
-            >
-              <div className="flex items-center justify-between">
-                <div className={cn("w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center")}>
-                  <Icon className={cn("w-6 h-6", type.color)} />
-                </div>
-                <div className="text-right">
-                  <p className="text-h3 text-foreground">{remaining}</p>
-                  <p className="text-caption text-muted-foreground">of {balance} days</p>
-                </div>
-              </div>
-              <p className="text-sm font-medium text-foreground mt-2">{type.name}</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {used} days used this year
-              </p>
-              <div className="w-full bg-secondary rounded-full h-2 mt-2">
-                <div
-                  className="bg-primary h-2 rounded-full transition-all duration-500"
-                  style={{ width: `${balance > 0 ? (remaining / balance) * 100 : 0}%` }}
-                />
-              </div>
-            </Card>
-          );
-        })}
-      </div>
-
       {/* Leave History */}
-      <Card className="dashboard-card">
-        <h2 className="text-h5 text-foreground mb-4">Leave History</h2>
-        <div className="space-y-3">
+      <Card className="dashboard-card overflow-hidden">
+        <div className="p-4 border-b border-border bg-secondary/10">
+          <h2 className="text-h5 text-foreground">Leave History</h2>
+        </div>
+        <div className="divide-y divide-border">
           {leaveHistory.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <CalendarIcon className="w-12 h-12 mx-auto mb-3 opacity-50" />
+            <div className="text-center py-12 text-muted-foreground">
+              <CalendarIcon className="w-12 h-12 mx-auto mb-3 opacity-20" />
               <p>No leave requests found</p>
             </div>
           ) : (
             leaveHistory.map((leave) => (
               <div
                 key={leave._id}
-                className="flex items-center justify-between p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors"
+                className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-background hover:bg-secondary/5 transition-colors gap-4"
               >
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <div className="flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                     <CalendarIcon className="w-5 h-5 text-primary" />
                   </div>
                   <div>
-                    <p className="font-medium text-foreground">{formatLeaveType(leave.leaveType)}</p>
-                    <p className="text-caption">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-medium text-foreground">{formatLeaveType(leave.leaveType)}</p>
+                      {getStatusBadge(leave.status)}
+                    </div>
+                    <p className="text-caption text-muted-foreground mt-0.5">
                       {formatDate(leave.startDate)} → {formatDate(leave.endDate)} ({leave.totalDays} day{leave.totalDays > 1 ? 's' : ''})
                     </p>
                     {leave.reason && (
-                      <p className="text-xs text-muted-foreground mt-1">{leave.reason}</p>
+                      <p className="text-sm text-foreground/80 mt-2 line-clamp-2">{leave.reason}</p>
                     )}
-                    {leave.reviewerComments && leave.status !== 'pending' && (
-                      <p className="text-xs text-muted-foreground mt-1 italic">
-                        Admin: {leave.reviewerComments}
-                      </p>
+
+                    {leave.attachments && leave.attachments.length > 0 && (
+                      <div className="mt-2 flex gap-2">
+                        {leave.attachments.map((att, idx) => (
+                          <a
+                            key={idx}
+                            href={att.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-primary hover:underline flex items-center gap-1"
+                          >
+                            <FileUp className="w-3 h-3" />
+                            View Attachment
+                          </a>
+                        ))}
+                      </div>
+                    )}
+
+                    {leave.reviewerComments && (
+                      <div className="mt-2 p-2 rounded bg-secondary/20 border border-border">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Admin Feedback</p>
+                        <p className="text-xs text-foreground mt-0.5">{leave.reviewerComments}</p>
+                      </div>
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  {getStatusBadge(leave.status)}
+                <div className="flex items-center sm:justify-end gap-3 shrink-0">
                   {leave.status === 'pending' && (
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
-                      className="text-destructive hover:text-destructive"
+                      className="text-destructive border-destructive/20 hover:bg-destructive/10"
                       onClick={() => handleCancelLeave(leave._id)}
                     >
                       Cancel

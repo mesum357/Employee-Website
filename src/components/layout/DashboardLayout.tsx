@@ -19,12 +19,13 @@ import {
   Video,
   ClipboardList
 } from "lucide-react";
+import { io, Socket } from "socket.io-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
-import { taskAPI, noticeAPI, chatAPI } from "@/lib/api";
+import { taskAPI, noticeAPI, chatAPI, meetingAPI } from "@/lib/api";
 import { useIsMobile } from "@/hooks/use-mobile";
 import mmhLogo from "@/assets/mmh-logo.png";
 import {
@@ -61,19 +62,49 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const [pendingTasksCount, setPendingTasksCount] = useState(0);
   const [unreadNoticesCount, setUnreadNoticesCount] = useState(0);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
+  const [unreadMeetingsCount, setUnreadMeetingsCount] = useState(0);
+  const [socket, setSocket] = useState<Socket | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout, isAuthenticated, isLoading } = useAuth();
   const isMobile = useIsMobile();
+  const [notifications, setNotifications] = useState<any[]>(() => {
+    const saved = localStorage.getItem('notifications');
+    return saved ? JSON.parse(saved) : [];
+  });
 
-  // Check if user is a manager (by department name)
+  // Play notification sound
+  const playNotificationSound = () => {
+    const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+    audio.play().catch(e => console.log('Sound play blocked by browser:', e));
+  };
+
+  // Add notification helper
+  const addNotification = (type: string, title: string, message: string, link: string) => {
+    const newNotif = {
+      id: Date.now().toString(),
+      type,
+      title,
+      message,
+      link,
+      timestamp: new Date().toISOString(),
+      read: false
+    };
+
+    setNotifications(prev => {
+      const updated = [newNotif, ...prev].slice(0, 20); // Keep last 20
+      localStorage.setItem('notifications', JSON.stringify(updated));
+      return updated;
+    });
+
+    playNotificationSound();
+  };
+
+  // Check if user is a manager (by designation name)
   const isManager = useMemo(() => {
-    const dept = user?.employee?.department;
-    if (!dept) return false;
-    // Handle both populated and non-populated department
-    const deptName = typeof dept === 'object' ? dept.name : dept;
-    return deptName?.toLowerCase() === 'manager';
-  }, [user?.employee?.department]);
+    const designation = user?.employee?.designation;
+    return designation?.toLowerCase() === 'manager';
+  }, [user?.employee?.designation]);
 
   // Filter navigation based on user role
   const filteredNavigation = useMemo(() => {
@@ -85,32 +116,77 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
 
   useEffect(() => {
     if (isAuthenticated && user) {
+      // Connect to Socket.io
+      const socketUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const newSocket = io(socketUrl.replace('/api', ''), {
+        withCredentials: true,
+        transports: ['websocket', 'polling']
+      });
+
+      newSocket.on('connect', () => {
+        console.log('🔌 Connected to real-time notifications');
+        newSocket.emit('join', user.id);
+      });
+
+      // Real-time event listeners
+      newSocket.on('newMessage', (data) => {
+        console.log('📩 New message received:', data);
+        fetchUnreadMessages();
+        addNotification('message', 'New Message', data.message || 'You have a new message', '/chat');
+      });
+
+      newSocket.on('newNotice', (data) => {
+        console.log('📢 New notice received:', data);
+        fetchUnreadNotices();
+        addNotification('notice', 'New Notice', data.title || 'A new notice has been posted', '/notices');
+      });
+
+      newSocket.on('newTask', (data) => {
+        console.log('📋 New task received:', data);
+        fetchPendingTasks();
+        addNotification('task', 'New Task', data.title || 'A new task has been assigned to you', '/dashboard');
+      });
+
+      newSocket.on('newMeeting', (data) => {
+        console.log('📅 New meeting scheduled:', data);
+        fetchUpcomingMeetings();
+        addNotification('meeting', 'New Meeting', data.title || 'A new meeting has been scheduled', '/meetings');
+      });
+
+      setSocket(newSocket);
+
+      // Initial fetch
       fetchPendingTasks();
       fetchUnreadNotices();
       fetchUnreadMessages();
-      // Refresh every 30 seconds
+      fetchUpcomingMeetings();
+
+      // Refresh occasionally as fallback
       const interval = setInterval(() => {
         fetchPendingTasks();
         fetchUnreadNotices();
         fetchUnreadMessages();
-      }, 30000);
+        fetchUpcomingMeetings();
+      }, 60000);
 
-      // Listen for refresh events from notices page
-      const handleRefresh = () => {
-        fetchUnreadNotices();
-      };
-      window.addEventListener('refreshUnreadNotices', handleRefresh);
+      // Listen for refresh events from pages
+      const handleRefreshNotices = () => fetchUnreadNotices();
+      const handleRefreshMessages = () => fetchUnreadMessages();
+      const handleRefreshMeetings = () => fetchUpcomingMeetings();
+      const handleRefreshTasks = () => fetchPendingTasks();
 
-      // Listen for refresh events from chat page
-      const handleChatRefresh = () => {
-        fetchUnreadMessages();
-      };
-      window.addEventListener('refreshUnreadMessages', handleChatRefresh);
+      window.addEventListener('refreshUnreadNotices', handleRefreshNotices);
+      window.addEventListener('refreshUnreadMessages', handleRefreshMessages);
+      window.addEventListener('refreshUnreadMeetings', handleRefreshMeetings);
+      window.addEventListener('refreshPendingTasks', handleRefreshTasks);
 
       return () => {
+        newSocket.disconnect();
         clearInterval(interval);
-        window.removeEventListener('refreshUnreadNotices', handleRefresh);
-        window.removeEventListener('refreshUnreadMessages', handleChatRefresh);
+        window.removeEventListener('refreshUnreadNotices', handleRefreshNotices);
+        window.removeEventListener('refreshUnreadMessages', handleRefreshMessages);
+        window.removeEventListener('refreshUnreadMeetings', handleRefreshMeetings);
+        window.removeEventListener('refreshPendingTasks', handleRefreshTasks);
       };
     }
   }, [isAuthenticated, user]);
@@ -164,6 +240,27 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     }
   };
 
+  const fetchUpcomingMeetings = async () => {
+    try {
+      const response = await meetingAPI.getUpcoming();
+      const meetings = response.data.data.meetings || [];
+      const userEmployeeId = user?.employee?._id || user?.employee;
+
+      // Count meetings where current user is an attendee and has status 'pending'
+      const unreadCount = meetings.filter((meeting: any) => {
+        const attendee = meeting.attendees?.find((a: any) => {
+          const attendeeEmpId = a.employee?._id || a.employee;
+          return attendeeEmpId?.toString() === userEmployeeId?.toString();
+        });
+        return attendee && attendee.status === 'pending';
+      }).length;
+
+      setUnreadMeetingsCount(unreadCount);
+    } catch (error) {
+      // Silently fail
+    }
+  };
+
   const isActive = (path: string) => location.pathname === path;
 
   const handleLogout = () => {
@@ -182,6 +279,8 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       fetchUnreadNotices();
     } else if (href === '/chat') {
       fetchUnreadMessages();
+    } else if (href === '/meetings') {
+      fetchUpcomingMeetings();
     }
     // Close sidebar on mobile/tablet after navigation
     if (isMobile || (typeof window !== 'undefined' && window.innerWidth < 1024)) {
@@ -211,8 +310,16 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         {filteredNavigation.map((item) => {
           const showChatBadge = item.name === 'Chat' && unreadMessagesCount > 0;
           const showNoticesBadge = item.name === 'Notices' && unreadNoticesCount > 0;
-          const showBadge = showChatBadge || showNoticesBadge;
-          const badgeCount = item.name === 'Chat' ? unreadMessagesCount : unreadNoticesCount;
+          const showMeetingsBadge = item.name === 'Meetings' && unreadMeetingsCount > 0;
+          const showTasksBadge = item.name === 'Dashboard' && pendingTasksCount > 0;
+
+          let badgeCount = 0;
+          if (item.name === 'Chat') badgeCount = unreadMessagesCount;
+          else if (item.name === 'Notices') badgeCount = unreadNoticesCount;
+          else if (item.name === 'Meetings') badgeCount = unreadMeetingsCount;
+          else if (item.name === 'Dashboard') badgeCount = pendingTasksCount;
+
+          const showBadge = showChatBadge || showNoticesBadge || showMeetingsBadge || showTasksBadge;
 
           return (
             <button
@@ -380,22 +487,73 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
                 </Badge>
               )}
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="relative"
-              onClick={() => {
-                navigate("/notices");
-                fetchUnreadNotices();
-              }}
-            >
-              <Bell className="w-5 h-5" />
-              {unreadNoticesCount > 0 && (
-                <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-destructive text-destructive-foreground">
-                  {unreadNoticesCount > 9 ? '9+' : unreadNoticesCount}
-                </Badge>
-              )}
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="relative"
+                >
+                  <Bell className="w-5 h-5" />
+                  {notifications.some(n => !n.read) && (
+                    <Badge className="absolute -top-1 -right-1 h-2 w-2 rounded-full p-0 bg-destructive animate-pulse" />
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-80 p-0 overflow-hidden">
+                <div className="p-4 bg-primary/5 border-b flex items-center justify-between">
+                  <h3 className="font-semibold text-sm">Notifications</h3>
+                  {notifications.some(n => !n.read) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs h-7 text-primary hover:text-primary/80"
+                      onClick={() => {
+                        const updated = notifications.map(n => ({ ...n, read: true }));
+                        setNotifications(updated);
+                        localStorage.setItem('notifications', JSON.stringify(updated));
+                      }}
+                    >
+                      Mark all read
+                    </Button>
+                  )}
+                </div>
+                <div className="max-h-[400px] overflow-y-auto">
+                  {notifications.length === 0 ? (
+                    <div className="p-8 text-center text-muted-foreground text-sm">
+                      No new notifications
+                    </div>
+                  ) : (
+                    notifications.map((n) => (
+                      <DropdownMenuItem
+                        key={n.id}
+                        className={cn(
+                          "p-4 cursor-pointer flex flex-col items-start gap-1 border-b last:border-0",
+                          !n.read && "bg-primary/[0.03]"
+                        )}
+                        onClick={() => {
+                          const updated = notifications.map(notif =>
+                            notif.id === n.id ? { ...notif, read: true } : notif
+                          );
+                          setNotifications(updated);
+                          localStorage.setItem('notifications', JSON.stringify(updated));
+                          navigate(n.link);
+                        }}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <span className="text-xs font-bold uppercase tracking-wider text-primary/70">{n.type}</span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <p className="font-medium text-sm leading-tight">{n.title}</p>
+                        <p className="text-xs text-muted-foreground line-clamp-2">{n.message}</p>
+                      </DropdownMenuItem>
+                    ))
+                  )}
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <button
               onClick={() => navigate("/profile")}
               className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center cursor-pointer hover:bg-primary/20 transition-colors"
