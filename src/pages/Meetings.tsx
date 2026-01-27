@@ -75,6 +75,19 @@ export default function Meetings() {
     fetchMeetings();
   }, []);
 
+  // Real-time refresh listener
+  useEffect(() => {
+    const handleRefresh = () => {
+      fetchMeetings();
+    };
+
+    window.addEventListener('refreshMeetings', handleRefresh);
+
+    return () => {
+      window.removeEventListener('refreshMeetings', handleRefresh);
+    };
+  }, []);
+
   const fetchMeetings = async () => {
     try {
       setLoading(true);
@@ -149,7 +162,7 @@ export default function Meetings() {
   const getMyAttendanceStatus = (meeting: Meeting) => {
     if (!user?.employee) return null;
     const attendee = meeting.attendees.find(
-      (a) => a.employee._id === user.employee?._id || a.employee._id === user.employee
+      (a) => a.employee._id === user.employee?.id
     );
     return attendee?.status || null;
   };
@@ -531,7 +544,7 @@ export default function Meetings() {
                 <div className="border rounded-lg p-4 max-h-60 overflow-y-auto">
                   <div className="space-y-3">
                     {selectedMeeting.attendees.map((attendee, index) => {
-                      const isMe = attendee.employee._id === user?.employee?._id || attendee.employee._id === user?.employee;
+                      const isMe = attendee.employee._id === user?.employee?.id;
                       return (
                         <div key={index} className="flex items-center justify-between">
                           <div>

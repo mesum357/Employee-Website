@@ -45,6 +45,7 @@ interface Task {
   title: string;
   dueDate: string;
   priority: string;
+  status: string;
 }
 
 const ticketCategories = [
@@ -90,6 +91,23 @@ const Dashboard = () => {
   useEffect(() => {
     fetchDashboardData();
     fetchMyTickets();
+  }, []);
+
+  // Real-time refresh listeners
+  useEffect(() => {
+    const handleRefresh = () => {
+      fetchDashboardData();
+    };
+
+    window.addEventListener('refreshUnreadNotices', handleRefresh);
+    window.addEventListener('refreshMeetings', handleRefresh);
+    window.addEventListener('refreshTasks', handleRefresh);
+
+    return () => {
+      window.removeEventListener('refreshUnreadNotices', handleRefresh);
+      window.removeEventListener('refreshMeetings', handleRefresh);
+      window.removeEventListener('refreshTasks', handleRefresh);
+    };
   }, []);
 
   const fetchMyTickets = async () => {

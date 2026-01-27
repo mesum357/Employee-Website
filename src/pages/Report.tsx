@@ -25,6 +25,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 interface Report {
@@ -73,6 +80,15 @@ const Report = () => {
   const [managerUpdatedReports, setManagerUpdatedReports] = useState<ManagerReport[]>([]);
   const [loadingManagerReports, setLoadingManagerReports] = useState(false);
   const [period, setPeriod] = useState<Period>('daily');
+  const [employeeReportDate, setEmployeeReportDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // Update Modal State
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+  const [updatingReport, setUpdatingReport] = useState<Report | null>(null);
+  const [updatingEmployee, setUpdatingEmployee] = useState<any>(null);
+  const [updatingHeadset, setUpdatingHeadset] = useState("");
+  const [updatingSales, setUpdatingSales] = useState("");
+  const [updatingSubmitting, setUpdatingSubmitting] = useState(false);
 
   // Check if user is a manager (by designation)
   const isManager = useMemo(() => {
@@ -142,9 +158,9 @@ const Report = () => {
     }
   };
 
-  const fetchEmployeeTodayReport = async (employeeId: string) => {
+  const fetchEmployeeReportByDate = async (employeeId: string, date: string) => {
     try {
-      const res = await reportAPI.getEmployeeTodayReport(employeeId);
+      const res = await reportAPI.getEmployeeTodayReport(employeeId, date);
       const report = res.data.data.report;
       if (report) {
         setEmployeeTodayReport(report);
@@ -165,13 +181,37 @@ const Report = () => {
 
   const handleEmployeeSelect = (employeeId: string) => {
     setSelectedEmployee(employeeId);
-    if (employeeId) {
-      fetchEmployeeTodayReport(employeeId);
-    } else {
-      setEmployeeTodayReport(null);
-      setEmployeeHeadset("0");
-      setEmployeeSales("10");
+    // Don't auto-fetch for sidebar form anymore as it's "Add only"
+    setEmployeeHeadset("0");
+    setEmployeeSales("10");
+  };
+
+  const handleOpenUpdate = async (employeeId: string) => {
+    const emp = employees.find(e => e._id === employeeId);
+    setUpdatingEmployee(emp);
+
+    try {
+      const res = await reportAPI.getEmployeeTodayReport(employeeId, employeeReportDate);
+      const report = res.data.data.report;
+      if (report) {
+        setUpdatingReport(report);
+        setUpdatingHeadset(report.headset?.toString() || "0");
+        setUpdatingSales(report.sales?.toString() || "10");
+      } else {
+        setUpdatingReport(null);
+        setUpdatingHeadset("0");
+        setUpdatingSales("10");
+      }
+      setIsUpdateModalOpen(true);
+    } catch (error) {
+      console.error("Error fetching report for update:", error);
+      toast.error("Failed to load report data");
     }
+  };
+
+  const handleDateChange = (newDate: string) => {
+    setEmployeeReportDate(newDate);
+    // Sidebar form stays "Add only", no auto-fetch
   };
 
   const handleEmployeeSubmit = async () => {
@@ -197,21 +237,53 @@ const Report = () => {
     try {
       const res = await reportAPI.updateEmployeeReport(selectedEmployee, {
         headset: headsetValue,
-        sales: salesValue
+        sales: salesValue,
+        date: employeeReportDate
       });
 
-      toast.success(res.data.message || "Report submitted successfully!", {
-        description: `Date: ${new Date().toLocaleDateString()}`,
+      toast.success(res.data.message || "Report added successfully!", {
+        description: `Date: ${new Date(employeeReportDate).toLocaleDateString()}`,
       });
 
-      // Refresh data
-      await fetchEmployeeTodayReport(selectedEmployee);
+      // Clear form after add
+      setSelectedEmployee("");
+      setEmployeeHeadset("0");
+      setEmployeeSales("10");
+
       await fetchManagerUpdatedReports();
     } catch (error: any) {
-      console.error("Error submitting employee report:", error);
-      toast.error(error.response?.data?.message || "Failed to submit report");
+      console.error("Error adding employee report:", error);
+      toast.error(error.response?.data?.message || "Failed to add report");
     } finally {
       setEmployeeSubmitting(false);
+    }
+  };
+
+  const handleUpdateSubmit = async () => {
+    if (!updatingEmployee) return;
+
+    const headsetValue = parseFloat(updatingHeadset) || 0;
+    const salesValue = parseFloat(updatingSales) || 0;
+
+    setUpdatingSubmitting(true);
+    try {
+      const res = await reportAPI.updateEmployeeReport(updatingEmployee._id, {
+        headset: headsetValue,
+        sales: salesValue,
+        date: employeeReportDate
+      });
+
+      toast.success(res.data.message || "Report updated successfully!", {
+        description: `Date: ${new Date(employeeReportDate).toLocaleDateString()}`,
+      });
+
+      setIsUpdateModalOpen(false);
+      await fetchManagerUpdatedReports();
+    } catch (error: any) {
+      console.error("Error updating employee report:", error);
+      toast.error(error.response?.data?.message || "Failed to update report");
+    } finally {
+      setUpdatingSubmitting(false);
     }
   };
 
@@ -294,7 +366,7 @@ const Report = () => {
       if (!data[empId]) {
         data[empId] = {
           name: `${report.employee.firstName} ${report.employee.lastName}`,
-          id: report.employee.employeeId,
+          id: report.employee._id,
           headset: 0,
           sales: 0,
           count: 0,
@@ -348,10 +420,10 @@ const Report = () => {
               </div>
               <div>
                 <h2 className="text-xl font-semibold text-foreground">
-                  Update Report
+                  Add Report
                 </h2>
                 <p className="text-xs text-muted-foreground">
-                  Today: {new Date().toLocaleDateString()}
+                  Date: {new Date(employeeReportDate).toLocaleDateString()}
                 </p>
               </div>
             </div>
@@ -371,6 +443,20 @@ const Report = () => {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="reportDate" className="text-sm font-medium flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-primary" />
+                  Select Date
+                </Label>
+                <Input
+                  id="reportDate"
+                  type="date"
+                  className="bg-white dark:bg-zinc-900 border-primary/20"
+                  value={employeeReportDate}
+                  onChange={(e) => handleDateChange(e.target.value)}
+                />
               </div>
 
               {selectedEmployee && (
@@ -409,12 +495,63 @@ const Report = () => {
                     className="w-full shadow-lg shadow-primary/20"
                   >
                     {employeeSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
-                    {employeeTodayReport ? "Update Report" : "Submit Report"}
+                    Add Report
                   </Button>
                 </div>
               )}
             </div>
           </Card>
+
+          <Dialog open={isUpdateModalOpen} onOpenChange={setIsUpdateModalOpen}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <User className="w-5 h-5 text-primary" />
+                  Update Report for {updatingEmployee?.firstName} {updatingEmployee?.lastName}
+                </DialogTitle>
+                <p className="text-xs text-muted-foreground">
+                  Date: {new Date(employeeReportDate).toLocaleDateString()}
+                </p>
+              </DialogHeader>
+
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="updateHeadset" className="flex items-center gap-2">
+                    <Headphones className="w-4 h-4 text-primary" />
+                    Headset Number
+                  </Label>
+                  <Input
+                    id="updateHeadset"
+                    type="number"
+                    value={updatingHeadset}
+                    onChange={(e) => setUpdatingHeadset(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="updateSales" className="flex items-center gap-2">
+                    <DollarSign className="w-4 h-4 text-primary" />
+                    Sales
+                  </Label>
+                  <Input
+                    id="updateSales"
+                    type="number"
+                    value={updatingSales}
+                    onChange={(e) => setUpdatingSales(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsUpdateModalOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleUpdateSubmit} disabled={updatingSubmitting}>
+                  {updatingSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save Changes"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {/* Aggregated Overview */}
           <div className="xl:col-span-2 space-y-6">
@@ -450,7 +587,11 @@ const Report = () => {
                           </div>
                           <span className="text-sm font-bold text-blue-600 font-mono">{data.headset}</span>
                         </div>
-                        <div className="h-2 w-full bg-blue-100 dark:bg-blue-900/20 rounded-full overflow-hidden">
+                        <div
+                          className="h-2 w-full bg-blue-100 dark:bg-blue-900/20 rounded-full overflow-hidden cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-800/40 transition-colors"
+                          onClick={() => handleOpenUpdate(data.id)}
+                          title={`Click to update report for ${data.name}`}
+                        >
                           <div
                             className="h-full bg-blue-500 rounded-full transition-all duration-500"
                             style={{ width: `${Math.min((data.headset / Math.max(...aggregatedData.map(d => d.headset || 1))) * 100, 100)}%` }}
@@ -496,7 +637,11 @@ const Report = () => {
                             <span className="text-sm font-bold font-mono">${data.sales.toLocaleString()}</span>
                           </div>
                         </div>
-                        <div className="h-2 w-full bg-emerald-100 dark:bg-emerald-900/20 rounded-full overflow-hidden">
+                        <div
+                          className="h-2 w-full bg-emerald-100 dark:bg-emerald-900/20 rounded-full overflow-hidden cursor-pointer hover:bg-emerald-200 dark:hover:bg-emerald-800/40 transition-colors"
+                          onClick={() => handleOpenUpdate(data.id)}
+                          title={`Click to update report for ${data.name}`}
+                        >
                           <div
                             className="h-full bg-emerald-500 rounded-full transition-all duration-500"
                             style={{ width: `${Math.min((data.sales / Math.max(...aggregatedData.map(d => d.sales || 1))) * 100, 100)}%` }}

@@ -79,8 +79,10 @@ export function TasksPopup() {
     };
 
     window.addEventListener('openTasks', handleOpenTasks);
+    window.addEventListener('refreshTasks', fetchTasks);
     return () => {
       window.removeEventListener('openTasks', handleOpenTasks);
+      window.removeEventListener('refreshTasks', fetchTasks);
     };
   }, []);
 
@@ -128,7 +130,7 @@ export function TasksPopup() {
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     const imageFiles = files.filter(file => file.type.startsWith('image/'));
-    
+
     if (imageFiles.length === 0) {
       toast({
         title: "Error",
@@ -163,7 +165,7 @@ export function TasksPopup() {
 
   const uploadImages = async (taskId: string): Promise<string[]> => {
     const uploadedUrls: string[] = [];
-    
+
     for (const image of selectedImages) {
       const formData = new FormData();
       formData.append('image', image);
@@ -176,8 +178,8 @@ export function TasksPopup() {
           // We need to construct the full URL
           const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
           const cleanBaseUrl = baseUrl.replace('/api', '');
-          const fileUrl = response.data.data.attachment.url.startsWith('http') 
-            ? response.data.data.attachment.url 
+          const fileUrl = response.data.data.attachment.url.startsWith('http')
+            ? response.data.data.attachment.url
             : `${cleanBaseUrl}${response.data.data.attachment.url}`;
           uploadedUrls.push(fileUrl);
         }
@@ -221,18 +223,18 @@ export function TasksPopup() {
       }
 
       // Update task with submission description and attachments
-      await taskAPI.update(selectedTask._id, { 
+      await taskAPI.update(selectedTask._id, {
         status: "under-review",
         progress: 100,
         submissionDescription: submissionDescription || submissionNote,
         attachments: uploadedAttachments
       });
-      
+
       toast({
         title: "Success",
         description: "Task submitted for review",
       });
-      
+
       setSelectedTask(null);
       setSubmissionNote("");
       setSubmissionDescription("");

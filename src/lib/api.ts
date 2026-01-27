@@ -227,9 +227,9 @@ export const reportAPI = {
   getEmployeeReport: (id: string) =>
     api.get(`/reports/employee/${id}`),
   // Manager-only methods
-  getEmployeeTodayReport: (employeeId: string) =>
-    api.get(`/reports/employee/${employeeId}/today`),
-  updateEmployeeReport: (employeeId: string, data: { headset: number; sales: number }) =>
+  getEmployeeTodayReport: (employeeId: string, date?: string) =>
+    api.get(`/reports/employee/${employeeId}/today`, { params: { date } }),
+  updateEmployeeReport: (employeeId: string, data: { headset: number; sales: number; date?: string }) =>
     api.post(`/reports/employee/${employeeId}`, data),
   getEmployees: () =>
     api.get('/employees/directory'),

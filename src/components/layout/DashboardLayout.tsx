@@ -63,7 +63,6 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const [unreadNoticesCount, setUnreadNoticesCount] = useState(0);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
   const [unreadMeetingsCount, setUnreadMeetingsCount] = useState(0);
-  const [socket, setSocket] = useState<Socket | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout, isAuthenticated, isLoading } = useAuth();
@@ -116,46 +115,7 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
 
   useEffect(() => {
     if (isAuthenticated && user) {
-      // Connect to Socket.io
-      const socketUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-      const newSocket = io(socketUrl.replace('/api', ''), {
-        withCredentials: true,
-        transports: ['websocket', 'polling']
-      });
-
-      newSocket.on('connect', () => {
-        console.log('🔌 Connected to real-time notifications');
-        newSocket.emit('join', user.id);
-      });
-
-      // Real-time event listeners
-      newSocket.on('newMessage', (data) => {
-        console.log('📩 New message received:', data);
-        fetchUnreadMessages();
-        addNotification('message', 'New Message', data.message || 'You have a new message', '/chat');
-      });
-
-      newSocket.on('newNotice', (data) => {
-        console.log('📢 New notice received:', data);
-        fetchUnreadNotices();
-        addNotification('notice', 'New Notice', data.title || 'A new notice has been posted', '/notices');
-      });
-
-      newSocket.on('newTask', (data) => {
-        console.log('📋 New task received:', data);
-        fetchPendingTasks();
-        addNotification('task', 'New Task', data.title || 'A new task has been assigned to you', '/dashboard');
-      });
-
-      newSocket.on('newMeeting', (data) => {
-        console.log('📅 New meeting scheduled:', data);
-        fetchUpcomingMeetings();
-        addNotification('meeting', 'New Meeting', data.title || 'A new meeting has been scheduled', '/meetings');
-      });
-
-      setSocket(newSocket);
-
-      // Initial fetch
+      // Initial fetch of unread counts
       fetchPendingTasks();
       fetchUnreadNotices();
       fetchUnreadMessages();
@@ -169,24 +129,46 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         fetchUpcomingMeetings();
       }, 60000);
 
-      // Listen for refresh events from pages
-      const handleRefreshNotices = () => fetchUnreadNotices();
-      const handleRefreshMessages = () => fetchUnreadMessages();
-      const handleRefreshMeetings = () => fetchUpcomingMeetings();
-      const handleRefreshTasks = () => fetchPendingTasks();
+      // Listen for refresh events from Global NotificationProvider
+      const handleRefreshNotices = (e: any) => {
+        fetchUnreadNotices();
+        if (e.detail) {
+          addNotification('notice', 'New Notice', e.detail.title || 'A new notice has been posted', '/notices');
+        }
+      };
 
-      window.addEventListener('refreshUnreadNotices', handleRefreshNotices);
-      window.addEventListener('refreshUnreadMessages', handleRefreshMessages);
-      window.addEventListener('refreshUnreadMeetings', handleRefreshMeetings);
-      window.addEventListener('refreshPendingTasks', handleRefreshTasks);
+      const handleRefreshMessages = (e: any) => {
+        fetchUnreadMessages();
+        if (e.detail && e.detail.message) {
+          addNotification('message', 'New Message', e.detail.message.content || 'You have a new message', '/chat');
+        }
+      };
+
+      const handleRefreshMeetings = (e: any) => {
+        fetchUpcomingMeetings();
+        if (e.detail) {
+          addNotification('meeting', 'New Meeting', e.detail.title || 'A new meeting has been scheduled', '/meetings');
+        }
+      };
+
+      const handleRefreshTasks = (e: any) => {
+        fetchPendingTasks();
+        if (e.detail) {
+          addNotification('task', 'New Task', e.detail.title || 'A new task has been assigned to you', '/dashboard');
+        }
+      };
+
+      window.addEventListener('refreshUnreadNotices', handleRefreshNotices as any);
+      window.addEventListener('refreshUnreadMessages', handleRefreshMessages as any);
+      window.addEventListener('refreshMeetings', handleRefreshMeetings as any);
+      window.addEventListener('refreshTasks', handleRefreshTasks as any);
 
       return () => {
-        newSocket.disconnect();
         clearInterval(interval);
-        window.removeEventListener('refreshUnreadNotices', handleRefreshNotices);
-        window.removeEventListener('refreshUnreadMessages', handleRefreshMessages);
-        window.removeEventListener('refreshUnreadMeetings', handleRefreshMeetings);
-        window.removeEventListener('refreshPendingTasks', handleRefreshTasks);
+        window.removeEventListener('refreshUnreadNotices', handleRefreshNotices as any);
+        window.removeEventListener('refreshUnreadMessages', handleRefreshMessages as any);
+        window.removeEventListener('refreshMeetings', handleRefreshMeetings as any);
+        window.removeEventListener('refreshTasks', handleRefreshTasks as any);
       };
     }
   }, [isAuthenticated, user]);
@@ -244,7 +226,7 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     try {
       const response = await meetingAPI.getUpcoming();
       const meetings = response.data.data.meetings || [];
-      const userEmployeeId = user?.employee?._id || user?.employee;
+      const userEmployeeId = user?.employee?.id || user?.employee;
 
       // Count meetings where current user is an attendee and has status 'pending'
       const unreadCount = meetings.filter((meeting: any) => {
