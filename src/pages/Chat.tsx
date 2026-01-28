@@ -4,11 +4,11 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { 
-  Search, 
-  Send, 
-  Paperclip, 
-  Smile, 
+import {
+  Search,
+  Send,
+  Paperclip,
+  Smile,
   MoreVertical,
   Phone,
   Video,
@@ -20,6 +20,7 @@ import {
   Loader2,
   AlertCircle,
   X,
+  ArrowLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { chatAPI, messageRequestAPI } from "@/lib/api";
@@ -95,6 +96,7 @@ const Chat = () => {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const socketRef = useRef<Socket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [showMobileChat, setShowMobileChat] = useState(false);
 
   // Initialize socket connection
   useEffect(() => {
@@ -103,7 +105,7 @@ const Chat = () => {
     // Get socket URL from API URL
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
     const socketUrl = apiUrl.replace('/api', '');
-    
+
     const socket = io(socketUrl, {
       transports: ['websocket', 'polling'],
       auth: {
@@ -133,7 +135,7 @@ const Chat = () => {
         });
         scrollToBottom();
       }
-      
+
       // Update chat list
       fetchChats();
     };
@@ -208,13 +210,13 @@ const Chat = () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       // Check if user is employee and trying to message boss
       if (user?.role === 'employee' && selectedUser.role === 'boss') {
         // Create message request instead of direct chat
         try {
           const response = await messageRequestAPI.create(selectedUser._id);
-          
+
           // If chat was created (request was already accepted), load it
           if (response.data.data.chat) {
             const chat = response.data.data.chat;
@@ -247,7 +249,8 @@ const Chat = () => {
 
         setSelectedChat(chatWithMessages);
         setMessages(chatWithMessages.messages?.filter((m: Message) => !m.isDeleted) || []);
-        
+        setShowMobileChat(true);
+
         // Refresh chats list
         fetchChats();
       }
@@ -262,14 +265,15 @@ const Chat = () => {
   const handleSelectChat = async (chat: Chat) => {
     try {
       setLoading(true);
-      
+
       // Fetch messages for this chat
       const messagesRes = await chatAPI.getById(chat._id);
       const chatWithMessages = messagesRes.data.data.chat;
 
       setSelectedChat(chatWithMessages);
       setMessages(chatWithMessages.messages?.filter((m: Message) => !m.isDeleted) || []);
-      
+      setShowMobileChat(true);
+
       // Refresh unread count in sidebar (messages are marked as read when fetching)
       window.dispatchEvent(new CustomEvent('refreshUnreadMessages'));
       // Refresh chat list to update unread counts
@@ -324,19 +328,19 @@ const Chat = () => {
     const attachments = [...uploadedAttachments];
     setMessageInput(""); // Clear input immediately for better UX
     setUploadedAttachments([]); // Clear attachments
-    
+
     try {
       setSending(true);
-      
+
       // Determine message type based on attachments
       let messageType = 'text';
       if (attachments.length > 0) {
         const hasImage = attachments.some(att => att.type === 'image');
         messageType = hasImage ? 'image' : 'file';
       }
-      
+
       const response = await chatAPI.sendMessage(selectedChat._id, messageContent, messageType, attachments);
-      
+
       if (response.data.success) {
         // Add message immediately for sender (optimistic update)
         // Other participants will receive via socket
@@ -348,7 +352,7 @@ const Chat = () => {
           return [...prev, newMessage];
         });
         scrollToBottom();
-        
+
         // Update chat list to update last message
         fetchChats();
       }
@@ -371,7 +375,7 @@ const Chat = () => {
     if (!user) return null;
     const other = chat.participants.find(p => p._id.toString() !== user.id);
     if (!other) return null;
-    
+
     // Format participant data
     if (other.employee) {
       return {
@@ -387,7 +391,7 @@ const Chat = () => {
         displayName: `${other.employee.firstName} ${other.employee.lastName}`
       };
     }
-    
+
     return {
       _id: other._id,
       email: other.email,
@@ -410,7 +414,7 @@ const Chat = () => {
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
     if (diffDays < 7) return `${diffDays}d ago`;
-    
+
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
@@ -437,7 +441,7 @@ const Chat = () => {
     return message.readBy?.some(r => r.user.toString() === user.id) || false;
   };
 
-  const filteredUsers = users.filter(u => 
+  const filteredUsers = users.filter(u =>
     u.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
     u.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -462,21 +466,24 @@ const Chat = () => {
   const otherUser = selectedChat ? getOtherParticipant(selectedChat) : null;
 
   return (
-    <div className="h-[calc(100vh-140px)] flex gap-6">
+    <div className="h-[calc(100vh-140px)] flex flex-col md:flex-row gap-4 md:gap-6 relative overflow-hidden">
       {/* Users/Chats List */}
-      <Card className="w-80 flex-shrink-0 flex flex-col overflow-hidden">
+      <Card className={cn(
+        "w-full md:w-80 flex-shrink-0 flex flex-col overflow-hidden",
+        showMobileChat && "hidden md:flex"
+      )}>
         <div className="p-4 border-b border-border">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search users..." 
+            <Input
+              placeholder="Search users..."
               className="pl-10"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
         </div>
-        
+
         <ScrollArea className="flex-1">
           <div className="p-2">
             {/* Existing Chats */}
@@ -486,15 +493,15 @@ const Chat = () => {
                 {filteredChats.map((chat) => {
                   const other = getOtherParticipant(chat);
                   if (!other) return null;
-                  
+
                   return (
                     <button
                       key={chat._id}
                       onClick={() => handleSelectChat(chat)}
                       className={cn(
                         "w-full flex items-center gap-3 p-3 rounded-xl transition-colors text-left mb-2",
-                        selectedChat?._id === chat._id 
-                          ? "bg-primary/10" 
+                        selectedChat?._id === chat._id
+                          ? "bg-primary/10"
                           : "hover:bg-secondary/50"
                       )}
                     >
@@ -552,7 +559,7 @@ const Chat = () => {
                     className={cn(
                       "w-full flex items-center gap-3 p-3 rounded-xl transition-colors text-left mb-2",
                       selectedChat && getOtherParticipant(selectedChat)?._id === chatUser._id
-                        ? "bg-primary/10" 
+                        ? "bg-primary/10"
                         : "hover:bg-secondary/50"
                     )}
                   >
@@ -596,10 +603,21 @@ const Chat = () => {
 
       {/* Chat Area */}
       {selectedChat && otherUser ? (
-        <Card className="flex-1 flex flex-col overflow-hidden">
+        <Card className={cn(
+          "flex-1 flex flex-col overflow-hidden",
+          !showMobileChat && "hidden md:flex"
+        )}>
           {/* Chat Header */}
-          <div className="p-4 border-b border-border flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <div className="p-3 md:p-4 border-b border-border flex items-center justify-between">
+            <div className="flex items-center gap-2 md:gap-3">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="md:hidden -ml-2 h-8 w-8 text-muted-foreground hover:text-foreground"
+                onClick={() => setShowMobileChat(false)}
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
               <div className="relative">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                   <span className="text-sm font-medium text-primary">
@@ -639,11 +657,11 @@ const Chat = () => {
                 </div>
               ) : (
                 messages.map((message) => {
-                  const isMe = typeof message.sender === 'object' 
+                  const isMe = typeof message.sender === 'object'
                     ? message.sender._id.toString() === user?.id
                     : message.sender === user?.id;
-                  const senderName = typeof message.sender === 'object' 
-                    ? message.sender.email 
+                  const senderName = typeof message.sender === 'object'
+                    ? message.sender.email
                     : 'Unknown';
 
                   return (
@@ -680,7 +698,7 @@ const Chat = () => {
                                     rel="noopener noreferrer"
                                     className={cn(
                                       "flex items-center gap-2 p-2 rounded-lg border",
-                                      isMe 
+                                      isMe
                                         ? "bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground"
                                         : "bg-secondary border-border text-foreground"
                                     )}
@@ -783,16 +801,16 @@ const Chat = () => {
                 accept="image/*"
                 onChange={(e) => handleFileSelect(e, true)}
               />
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 size="icon"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
               >
                 <Paperclip className="w-5 h-5" />
               </Button>
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 size="icon"
                 onClick={() => imageInputRef.current?.click()}
                 disabled={uploading}
@@ -815,8 +833,8 @@ const Chat = () => {
               <Button variant="ghost" size="icon">
                 <Smile className="w-5 h-5" />
               </Button>
-              <Button 
-                size="icon" 
+              <Button
+                size="icon"
                 disabled={(!messageInput.trim() && uploadedAttachments.length === 0) || sending || uploading}
                 onClick={handleSendMessage}
               >
