@@ -15,6 +15,7 @@ import {
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
@@ -213,6 +214,9 @@ const Leave = () => {
           <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
             <SheetHeader>
               <SheetTitle className="text-h4">New Leave Request</SheetTitle>
+              <SheetDescription>
+                Fill out the form below to request time off.
+              </SheetDescription>
             </SheetHeader>
             <div className="space-y-6 mt-6">
               {/* Leave Type */}
@@ -316,16 +320,7 @@ const Leave = () => {
                 </div>
               </div>
 
-              {/* Policy Reminder */}
-              <Card className="p-4 bg-secondary/50">
-                <div className="flex gap-3">
-                  <AlertCircle className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-                  <p className="text-small text-muted-foreground">
-                    Leave requests should be submitted at least 3 days in advance for annual leave.
-                    Emergency sick leave can be requested on the same day.
-                  </p>
-                </div>
-              </Card>
+
 
               {error && (
                 <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 text-destructive text-sm">

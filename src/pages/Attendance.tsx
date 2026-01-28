@@ -280,14 +280,35 @@ const Attendance = () => {
     });
   };
 
-  const calculateWorkHours = (checkIn?: { time: string }, checkOut?: { time: string }) => {
-    if (!checkIn?.time || !checkOut?.time) return '-';
-    const inTime = new Date(checkIn.time);
-    const outTime = new Date(checkOut.time);
+  const calculateTotalBreakTime = (breaks?: Break[]) => {
+    if (!breaks || breaks.length === 0) return 0;
+    return breaks.reduce((total, b) => total + (b.duration || 0), 0);
+  };
+
+  const formatDuration = (minutes: number) => {
+    if (minutes <= 0) return '0m';
+    const h = Math.floor(minutes / 60);
+    const m = Math.floor(minutes % 60);
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  };
+
+  const calculateRecordWorkHours = (record: AttendanceRecord) => {
+    if (!record.checkIn?.time || !record.checkOut?.time) return '-';
+
+    // If backend has already provided calculated workingHours
+    if (record.workingHours !== undefined) {
+      const totalMinutes = Math.round(record.workingHours * 60);
+      return formatDuration(totalMinutes);
+    }
+
+    // Manual calculation fallback
+    const inTime = new Date(record.checkIn.time);
+    const outTime = new Date(record.checkOut.time);
     const diffMs = outTime.getTime() - inTime.getTime();
-    const hours = Math.floor(diffMs / (1000 * 60 * 60));
-    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-    return `${hours}h ${minutes}m`;
+    const totalMinutes = Math.floor(diffMs / (1000 * 60));
+
+    const breakMinutes = calculateTotalBreakTime(record.breaks);
+    return formatDuration(Math.max(0, totalMinutes - breakMinutes));
   };
 
   const getStatusBadge = (record: AttendanceRecord) => {
@@ -297,7 +318,28 @@ const Attendance = () => {
     recordDate.setHours(0, 0, 0, 0);
     const isPastDay = recordDate < today;
 
+    const recordStatus = record.status?.toLowerCase();
+
+    // Status colors and labels mapping
+    const statusMap: Record<string, { label: string, color: string, icon?: any }> = {
+      present: { label: 'Present', color: 'bg-success-light text-success', icon: Check },
+      late: { label: 'Late', color: 'bg-warning/10 text-warning', icon: Clock },
+      'half-day': { label: 'Half Day', color: 'bg-warning/10 text-warning', icon: AlertCircle },
+      'on-leave': { label: 'On Leave', color: 'bg-primary/10 text-primary', icon: Calendar },
+      absent: { label: 'Absent', color: 'bg-destructive/10 text-destructive', icon: AlertCircle },
+    };
+
     if (record.checkOut?.time) {
+      // Completed day - use either specialized status or 'Complete'
+      const statusInfo = statusMap[recordStatus];
+      if (statusInfo && recordStatus !== 'present') {
+        return (
+          <span className={cn("inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium", statusInfo.color)}>
+            {statusInfo.icon && <statusInfo.icon className="w-3 h-3" />}
+            {statusInfo.label}
+          </span>
+        );
+      }
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-success-light text-success">
           <Check className="w-3 h-3" />
@@ -305,8 +347,8 @@ const Attendance = () => {
         </span>
       );
     }
+
     if (record.checkIn?.time) {
-      // If day has passed and no checkout, show Incomplete
       if (isPastDay) {
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-destructive/10 text-destructive">
@@ -315,15 +357,14 @@ const Attendance = () => {
           </span>
         );
       }
-      // Still today, show In Progress
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-warning/10 text-warning">
           <Clock className="w-3 h-3" />
-          In Progress
+          {recordStatus === 'late' ? 'Late (In Progress)' : 'In Progress'}
         </span>
       );
     }
-    // No clock in at all
+
     return (
       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-destructive/10 text-destructive">
         Absent
@@ -677,8 +718,9 @@ const Attendance = () => {
                 <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Date</th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Clock In</th>
                 <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Clock Out</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Total Hours</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
+                <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground">Break Time</th>
+                <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground">Work Hours</th>
+                <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
               </tr>
             </thead>
             <tbody>
@@ -703,10 +745,15 @@ const Attendance = () => {
                     <td className="py-4 px-4 text-muted-foreground">
                       {formatRecordTime(record.checkOut?.time)}
                     </td>
-                    <td className="py-4 px-4 font-medium text-foreground">
-                      {calculateWorkHours(record.checkIn, record.checkOut)}
+                    <td className="py-4 px-4 text-center text-warning font-medium">
+                      {record.breaks && record.breaks.length > 0
+                        ? formatDuration(calculateTotalBreakTime(record.breaks))
+                        : '-'}
                     </td>
-                    <td className="py-4 px-4">
+                    <td className="py-4 px-4 text-center font-bold text-foreground">
+                      {calculateRecordWorkHours(record)}
+                    </td>
+                    <td className="py-4 px-4 text-center">
                       {getStatusBadge(record)}
                     </td>
                   </tr>
