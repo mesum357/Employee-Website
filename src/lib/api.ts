@@ -241,6 +241,8 @@ export const reportAPI = {
     api.get('/employees/directory'),
   getManagerUpdatedReports: (params?: any) =>
     api.get('/reports/manager/updated', { params }),
+  updateReport: (id: string, data: any) =>
+    api.put(`/reports/${id}`, data),
 };
 
 // Settings/Profile API

@@ -163,31 +163,14 @@ const Report = () => {
     }
   };
 
-  const handleOpenUpdate = async (employeeId: string) => {
-    const emp = employees.find(e => e._id === employeeId);
-    setUpdatingEmployee(emp);
-
-    try {
-      const res = await reportAPI.getEmployeeTodayReport(employeeId, employeeReportDate);
-      const report = res.data.data.report;
-      if (report) {
-        setUpdatingReport(report);
-        setUpdatingHeadset(report.headset?.toString() || "0");
-        setUpdatingSalesAmount(report.sales?.toString() || "0");
-        setUpdatingSalesCount(report.salesCount?.toString() || "0");
-        setUpdatingSalesDetails(report.salesDetails || "");
-      } else {
-        setUpdatingReport(null);
-        setUpdatingHeadset("0");
-        setUpdatingSalesAmount("0");
-        setUpdatingSalesCount("0");
-        setUpdatingSalesDetails("");
-      }
-      setIsUpdateModalOpen(true);
-    } catch (error) {
-      console.error("Error fetching report for update:", error);
-      toast.error("Failed to load report data");
-    }
+  const handleOpenUpdate = (report: ManagerReport) => {
+    setUpdatingEmployee(report.employee);
+    setUpdatingReport(report);
+    setUpdatingHeadset(report.headset?.toString() || "0");
+    setUpdatingSalesAmount(report.sales?.toString() || "0");
+    setUpdatingSalesCount(report.salesCount?.toString() || "0");
+    setUpdatingSalesDetails(report.salesDetails || "");
+    setIsUpdateModalOpen(true);
   };
 
   const handleDateChange = (newDate: string) => {
@@ -271,15 +254,27 @@ const Report = () => {
 
     setUpdatingSubmitting(true);
     try {
-      const res = await reportAPI.updateEmployeeReport(updatingEmployee._id, {
-        headset: headsetValue,
-        sales: salesAmountValue,
-        salesCount: salesCountValue,
-        salesDetails: updatingSalesDetails,
-        date: employeeReportDate
-      });
+      // If we have a specific report ID, use the update API
+      // Otherwise, use the legacy create/update API
+      if (updatingReport && (updatingReport as any)._id) {
+        await reportAPI.updateReport((updatingReport as any)._id, {
+          headset: headsetValue,
+          sales: salesAmountValue,
+          salesCount: salesCountValue,
+          salesDetails: updatingSalesDetails,
+          date: employeeReportDate
+        });
+      } else {
+        await reportAPI.updateEmployeeReport(updatingEmployee._id, {
+          headset: headsetValue,
+          sales: salesAmountValue,
+          salesCount: salesCountValue,
+          salesDetails: updatingSalesDetails,
+          date: employeeReportDate
+        });
+      }
 
-      toast.success(res.data.message || "Report updated successfully!");
+      toast.success("Report updated successfully!");
       setIsUpdateModalOpen(false);
       await fetchManagerUpdatedReports();
     } catch (error: any) {
@@ -601,7 +596,7 @@ const Report = () => {
                           <span className="text-sm">Sales: <span className="font-bold">{report.salesCount || 0}</span></span>
                           <span className="text-sm">Amount: <span className="font-bold text-emerald-600">${report.sales.toLocaleString()}</span></span>
                         </div>
-                        <Button variant="ghost" size="sm" onClick={() => handleOpenUpdate(report.employee._id)}>Update</Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleOpenUpdate(report)}>Update</Button>
                       </div>
                       {report.salesDetails && (
                         <p className="mt-2 text-xs text-muted-foreground italic border-t pt-1">

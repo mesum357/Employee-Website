@@ -145,7 +145,16 @@ const Dashboard = () => {
 
       // Process today's attendance
       const todayData = todayRes.data.data;
-      if (todayData.isCheckedIn) {
+      if (todayData.isCheckedOut) {
+        setTodayStatus("Day Complete");
+        const checkOutTime = new Date(todayData.attendance?.checkOut?.time || new Date());
+        setClockInTime(checkOutTime.toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        }));
+        setTodayWorkingHours(todayData.attendance?.workingHours || 0);
+      } else if (todayData.isCheckedIn) {
         const checkInTime = new Date(todayData.attendance?.checkIn?.time || new Date());
         setTodayStatus("Clocked In");
         setClockInTime(checkInTime.toLocaleTimeString('en-US', {
@@ -215,10 +224,10 @@ const Dashboard = () => {
     {
       title: "Today's Status",
       value: todayStatus,
-      subtitle: clockInTime ? `Since ${clockInTime}` : "Not checked in yet",
+      subtitle: todayStatus === "Day Complete" ? `Finished at ${clockInTime}` : clockInTime ? `Since ${clockInTime}` : "Not checked in yet",
       icon: Clock,
-      color: todayStatus === "Clocked In" ? "text-success" : "text-muted-foreground",
-      bgColor: todayStatus === "Clocked In" ? "bg-success-light" : "bg-muted/20",
+      color: todayStatus === "Clocked In" || todayStatus === "Day Complete" ? "text-success" : "text-muted-foreground",
+      bgColor: todayStatus === "Clocked In" || todayStatus === "Day Complete" ? "bg-success-light" : "bg-muted/20",
     },
     {
       title: "This Month",
@@ -322,9 +331,10 @@ const Dashboard = () => {
           size="lg"
           className="shadow-glow"
           onClick={() => navigate("/attendance")}
+          disabled={todayStatus === "Day Complete"}
         >
           <Clock className="w-5 h-5 mr-2" />
-          {todayStatus === "Clocked In" ? "Quick Clock Out" : "Clock In"}
+          {todayStatus === "Day Complete" ? "Day Complete" : todayStatus === "Clocked In" ? "Quick Clock Out" : "Clock In"}
         </Button>
       </div>
 
