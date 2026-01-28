@@ -212,7 +212,7 @@ export const meetingAPI = {
 
 // Report API
 export const reportAPI = {
-  create: (data: { headset: number; sales: number }) =>
+  create: (data: { headset?: number; sales?: number; salesCount?: number; salesDetails?: string }) =>
     api.post('/reports', data),
   getMy: (params?: any) =>
     api.get('/reports/my', { params }),
@@ -229,7 +229,13 @@ export const reportAPI = {
   // Manager-only methods
   getEmployeeTodayReport: (employeeId: string, date?: string) =>
     api.get(`/reports/employee/${employeeId}/today`, { params: { date } }),
-  updateEmployeeReport: (employeeId: string, data: { headset: number; sales: number; date?: string }) =>
+  updateEmployeeReport: (employeeId: string, data: {
+    headset?: number;
+    sales?: number;
+    salesCount?: number;
+    salesDetails?: string;
+    date?: string
+  }) =>
     api.post(`/reports/employee/${employeeId}`, data),
   getEmployees: () =>
     api.get('/employees/directory'),
