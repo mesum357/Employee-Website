@@ -11,6 +11,7 @@ import {
   Plus,
   Loader2,
   CheckSquare,
+  Timer,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -77,6 +78,7 @@ const Dashboard = () => {
   const [todayStatus, setTodayStatus] = useState("Not Clocked In");
   const [clockInTime, setClockInTime] = useState("");
   const [monthlyAttendanceRate, setMonthlyAttendanceRate] = useState(0);
+  const [todayWorkingHours, setTodayWorkingHours] = useState(0);
   const [recentNotices, setRecentNotices] = useState<Notice[]>([]);
   const [upcomingTasks, setUpcomingTasks] = useState<Task[]>([]);
 
@@ -151,9 +153,11 @@ const Dashboard = () => {
           minute: '2-digit',
           hour12: true
         }));
+        setTodayWorkingHours(todayData.currentWorkingHours || 0);
       } else {
         setTodayStatus("Not Clocked In");
         setClockInTime("");
+        setTodayWorkingHours(0);
       }
 
       // Process monthly attendance rate
@@ -223,6 +227,14 @@ const Dashboard = () => {
       icon: TrendingUp,
       color: "text-accent",
       bgColor: "bg-accent-light",
+    },
+    {
+      title: "Working Hours",
+      value: `${todayWorkingHours} hrs`,
+      subtitle: "Today's logs",
+      icon: Timer,
+      color: "text-primary",
+      bgColor: "bg-primary-light",
     },
   ];
 
@@ -317,7 +329,7 @@ const Dashboard = () => {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {kpiCards.map((card, index) => (
           <div
             key={card.title}
