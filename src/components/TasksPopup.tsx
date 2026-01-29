@@ -290,7 +290,7 @@ export function TasksPopup() {
         ) : (
           <div className="flex-1 overflow-hidden flex flex-col gap-4">
             {/* Stats */}
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div className="bg-card rounded-lg border border-border p-4">
                 <div className="text-2xl font-bold">{pendingTasks.length}</div>
                 <div className="text-sm text-muted-foreground">Pending</div>
@@ -331,7 +331,7 @@ export function TasksPopup() {
                         overdue && "border-destructive/50"
                       )}
                     >
-                      <div className="flex items-start justify-between gap-4">
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                         <div className="flex items-start gap-3 flex-1">
                           <div className={cn("p-2 rounded-lg", priority.color)}>
                             <PriorityIcon className="w-4 h-4" />

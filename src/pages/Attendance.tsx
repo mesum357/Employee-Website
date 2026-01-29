@@ -711,8 +711,8 @@ const Attendance = () => {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
+        <div className="table-container">
+          <table className="data-table">
             <thead>
               <tr className="border-b border-border">
                 <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Date</th>
