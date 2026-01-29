@@ -197,9 +197,9 @@ const Leave = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-full overflow-x-hidden px-1">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-h2 text-foreground">Leave Management</h1>
           <p className="text-muted-foreground mt-1">Request time off and track your leave history</p>
@@ -240,39 +240,41 @@ const Leave = () => {
               </div>
 
               {/* Date Selection */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Start Date *</Label>
                   <Button
                     variant="outline"
-                    className={cn("w-full justify-start", !startDate && "text-muted-foreground")}
+                    className={cn("w-full justify-start text-left font-normal", !startDate && "text-muted-foreground")}
                   >
                     <CalendarIcon className="w-4 h-4 mr-2" />
-                    {startDate ? format(startDate, "PPP") : "Pick date"}
+                    <span className="truncate">{startDate ? format(startDate, "PPP") : "Pick date"}</span>
                   </Button>
                 </div>
                 <div className="space-y-2">
                   <Label>End Date *</Label>
                   <Button
                     variant="outline"
-                    className={cn("w-full justify-start", !endDate && "text-muted-foreground")}
+                    className={cn("w-full justify-start text-left font-normal", !endDate && "text-muted-foreground")}
                   >
                     <CalendarIcon className="w-4 h-4 mr-2" />
-                    {endDate ? format(endDate, "PPP") : "Pick date"}
+                    <span className="truncate">{endDate ? format(endDate, "PPP") : "Pick date"}</span>
                   </Button>
                 </div>
               </div>
 
-              <Calendar
-                mode="range"
-                selected={{ from: startDate, to: endDate }}
-                onSelect={(range) => {
-                  setStartDate(range?.from);
-                  setEndDate(range?.to || range?.from);
-                }}
-                className="rounded-xl border pointer-events-auto"
-                disabled={(date) => date < new Date()}
-              />
+              <div className="flex justify-center overflow-x-auto w-full">
+                <Calendar
+                  mode="range"
+                  selected={{ from: startDate, to: endDate }}
+                  onSelect={(range) => {
+                    setStartDate(range?.from);
+                    setEndDate(range?.to || range?.from);
+                  }}
+                  className="rounded-xl border pointer-events-auto w-fit"
+                  disabled={(date) => date < new Date()}
+                />
+              </div>
 
               {/* Partial Day Toggle */}
               <div className="flex items-center justify-between">
@@ -390,11 +392,13 @@ const Leave = () => {
                       <p className="font-medium text-foreground">{formatLeaveType(leave.leaveType)}</p>
                       {getStatusBadge(leave.status)}
                     </div>
-                    <p className="text-caption text-muted-foreground mt-0.5">
-                      {formatDate(leave.startDate)} → {formatDate(leave.endDate)} ({leave.totalDays} day{leave.totalDays > 1 ? 's' : ''})
+                    <p className="text-xs sm:text-caption text-muted-foreground mt-1">
+                      {formatDate(leave.startDate)} → {formatDate(leave.endDate)}
+                      <span className="mx-1.5 opacity-30">•</span>
+                      <span className="font-medium text-foreground/70">{leave.totalDays} day{leave.totalDays > 1 ? 's' : ''}</span>
                     </p>
                     {leave.reason && (
-                      <p className="text-sm text-foreground/80 mt-2 line-clamp-2">{leave.reason}</p>
+                      <p className="text-sm text-foreground/80 mt-3 border-l-2 border-primary/10 pl-3 py-0.5 line-clamp-3 italic leading-relaxed">{leave.reason}</p>
                     )}
 
                     {leave.attachments && leave.attachments.length > 0 && (

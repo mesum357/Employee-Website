@@ -426,7 +426,7 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
 
       {/* Main Content */}
       <div className={cn(
-        "flex-1 transition-all duration-300",
+        "flex-1 transition-all duration-300 min-w-0 overflow-x-hidden",
         "lg:ml-64",
         collapsed && "lg:ml-20"
       )}>

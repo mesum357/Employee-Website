@@ -217,7 +217,7 @@ const Notices = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-full overflow-x-hidden px-1">
       {/* Header */}
       <div>
         <h1 className="text-h2 text-foreground">Notice Board</h1>
@@ -233,33 +233,35 @@ const Notices = () => {
 
       {/* Search & Filters */}
       <div className="flex flex-col md:flex-row gap-4">
-        <div className="relative flex-1">
+        <div className="flex-1 relative min-w-0">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
           <Input
             placeholder="Search notices..."
-            className="pl-12 h-11 md:h-10"
+            className="pl-12 h-11 md:h-10 w-full"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <div className="flex gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-none -mx-1 px-1 w-full">
-          {categories.map((cat) => (
-            <Button
-              key={cat}
-              variant={selectedCategory === cat ? "default" : "outline"}
-              size="sm"
-              className="whitespace-nowrap h-9 md:h-10 flex-shrink-0"
-              onClick={() => setSelectedCategory(cat)}
-            >
-              {cat}
-            </Button>
-          ))}
+        <div className="w-full md:w-auto">
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none w-full">
+            {categories.map((cat) => (
+              <Button
+                key={cat}
+                variant={selectedCategory === cat ? "default" : "outline"}
+                size="sm"
+                className="whitespace-nowrap h-9 md:h-10 flex-shrink-0"
+                onClick={() => setSelectedCategory(cat)}
+              >
+                {cat}
+              </Button>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* Pinned Strip */}
       {pinnedNotices.length > 0 && (
-        <Card className="p-4 bg-primary/5 border-primary/20">
+        <Card className="p-4 bg-primary/5 border-primary/20 w-full overflow-hidden">
           <div className="flex items-center gap-2 text-primary mb-3">
             <Pin className="w-4 h-4" />
             <span className="text-sm font-medium">Pinned Notices</span>
@@ -308,7 +310,7 @@ const Notices = () => {
               key={notice._id}
               onClick={() => handleNoticeClick(notice)}
               className={cn(
-                "dashboard-card cursor-pointer group animate-fade-up",
+                "dashboard-card cursor-pointer group animate-fade-up w-full overflow-hidden",
                 `delay-${(index + 1) * 100}`,
                 !isRead && "border-primary/20 bg-primary/5"
               )}
