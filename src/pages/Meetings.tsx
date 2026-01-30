@@ -29,7 +29,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { cn } from "@/lib/utils";
+import { cn, formatExternalUrl } from "@/lib/utils";
 import { meetingAPI } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -276,7 +276,7 @@ export default function Meetings() {
                           <Button
                             size="sm"
                             className="gap-1.5"
-                            onClick={() => window.open(meeting.meetingLink, "_blank")}
+                            onClick={() => window.open(formatExternalUrl(meeting.meetingLink), "_blank")}
                           >
                             <Video className="w-4 h-4" />
                             Join
@@ -360,7 +360,7 @@ export default function Meetings() {
                           <Button
                             size="sm"
                             className="gap-1.5"
-                            onClick={() => window.open(meeting.meetingLink, "_blank")}
+                            onClick={() => window.open(formatExternalUrl(meeting.meetingLink), "_blank")}
                           >
                             <Video className="w-4 h-4" />
                             Join
@@ -457,7 +457,7 @@ export default function Meetings() {
                           <Button
                             size="sm"
                             className="gap-1.5"
-                            onClick={() => window.open(meeting.meetingLink, "_blank")}
+                            onClick={() => window.open(formatExternalUrl(meeting.meetingLink), "_blank")}
                           >
                             <Video className="w-4 h-4" />
                             Join
@@ -517,7 +517,7 @@ export default function Meetings() {
                     <label className="text-sm font-medium text-muted-foreground">Meeting Link</label>
                     <div className="flex items-center gap-2 mt-1">
                       <a
-                        href={selectedMeeting.meetingLink}
+                        href={formatExternalUrl(selectedMeeting.meetingLink)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="font-medium text-primary hover:underline flex items-center gap-1"
@@ -613,7 +613,7 @@ export default function Meetings() {
 
           <DialogFooter>
             {selectedMeeting?.meetingLink && selectedMeeting.status !== "completed" && selectedMeeting.status !== "cancelled" && (
-              <Button onClick={() => window.open(selectedMeeting.meetingLink, "_blank")}>
+              <Button onClick={() => window.open(formatExternalUrl(selectedMeeting.meetingLink), "_blank")}>
                 <Video className="w-4 h-4 mr-2" />
                 Join Meeting
               </Button>
