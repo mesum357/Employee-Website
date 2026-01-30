@@ -39,43 +39,7 @@ interface ChatMessageNotification {
 }
 
 // Notification sound generator using Web Audio API
-const playNotificationSound = () => {
-    try {
-        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-
-        // Create a pleasant notification sound (laptop-style ping)
-        const oscillator1 = audioContext.createOscillator();
-        const oscillator2 = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-
-        oscillator1.connect(gainNode);
-        oscillator2.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-
-        // Set frequencies for a pleasant chime
-        oscillator1.frequency.setValueAtTime(880, audioContext.currentTime); // A5
-        oscillator1.frequency.setValueAtTime(1100, audioContext.currentTime + 0.1); // ~C#6
-        oscillator2.frequency.setValueAtTime(1320, audioContext.currentTime); // E6
-        oscillator2.frequency.setValueAtTime(1650, audioContext.currentTime + 0.1); // ~G#6
-
-        oscillator1.type = 'sine';
-        oscillator2.type = 'sine';
-
-        // Volume envelope
-        gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-        gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.02);
-        gainNode.gain.linearRampToValueAtTime(0.2, audioContext.currentTime + 0.1);
-        gainNode.gain.linearRampToValueAtTime(0.15, audioContext.currentTime + 0.2);
-        gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.5);
-
-        oscillator1.start(audioContext.currentTime);
-        oscillator2.start(audioContext.currentTime);
-        oscillator1.stop(audioContext.currentTime + 0.5);
-        oscillator2.stop(audioContext.currentTime + 0.5);
-    } catch (error) {
-        console.log('Could not play notification sound:', error);
-    }
-};
+// Consolidate sound logic
 
 // Get icon based on category/priority
 const getNoticeIcon = (category: string, priority: string) => {
@@ -106,7 +70,6 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     const navigate = useNavigate();
 
     const handleNewNotice = useCallback((notice: NoticeNotification) => {
-        playNotificationSound();
         window.dispatchEvent(new CustomEvent('refreshUnreadNotices', { detail: notice }));
         const Icon = getNoticeIcon(notice.category, notice.priority);
         const priorityLabel = notice.priority === 'critical' || notice.priority === 'high'
@@ -134,7 +97,6 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     }, [navigate]);
 
     const handleNewMeeting = useCallback((meeting: MeetingNotification) => {
-        playNotificationSound();
         window.dispatchEvent(new CustomEvent('refreshMeetings', { detail: meeting }));
         toast.custom((t) => (
             <div
@@ -156,7 +118,6 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     }, [navigate]);
 
     const handleNewTask = useCallback((task: TaskNotification) => {
-        playNotificationSound();
         window.dispatchEvent(new CustomEvent('refreshTasks', { detail: task }));
         toast.custom((t) => (
             <div
@@ -182,7 +143,6 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
         const isChatPage = window.location.pathname === '/chat';
         if (isChatPage) return; // Chat.tsx handles its own real-time updates
 
-        playNotificationSound();
         window.dispatchEvent(new CustomEvent('refreshUnreadMessages', { detail: data }));
 
         toast.custom((t) => (
