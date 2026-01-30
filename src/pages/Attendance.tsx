@@ -712,55 +712,102 @@ const Attendance = () => {
         </div>
 
         <div className="table-container">
-          <table className="data-table">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Date</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Clock In</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Clock Out</th>
-                <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground">Break Time</th>
-                <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground">Work Hours</th>
-                <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {punchHistory.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="py-8 text-center text-muted-foreground">
-                    No attendance records found for this month
-                  </td>
+          {/* Desktop View */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Date</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Clock In</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Clock Out</th>
+                  <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground">Break Time</th>
+                  <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground">Work Hours</th>
+                  <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
                 </tr>
-              ) : (
-                punchHistory.map((record) => (
-                  <tr
-                    key={record._id}
-                    className="border-b border-border/50 hover:bg-secondary/50 transition-colors"
-                  >
-                    <td className="py-4 px-4 font-medium text-foreground">
-                      {formatRecordDate(record.date)}
-                    </td>
-                    <td className="py-4 px-4 text-muted-foreground">
-                      {formatRecordTime(record.checkIn?.time)}
-                    </td>
-                    <td className="py-4 px-4 text-muted-foreground">
-                      {formatRecordTime(record.checkOut?.time)}
-                    </td>
-                    <td className="py-4 px-4 text-center text-warning font-medium">
-                      {record.breaks && record.breaks.length > 0
-                        ? formatDuration(calculateTotalBreakTime(record.breaks))
-                        : '-'}
-                    </td>
-                    <td className="py-4 px-4 text-center font-bold text-foreground">
-                      {calculateRecordWorkHours(record)}
-                    </td>
-                    <td className="py-4 px-4 text-center">
-                      {getStatusBadge(record)}
+              </thead>
+              <tbody>
+                {punchHistory.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-muted-foreground">
+                      No attendance records found for this month
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  punchHistory.map((record) => (
+                    <tr
+                      key={record._id}
+                      className="border-b border-border/50 hover:bg-secondary/50 transition-colors"
+                    >
+                      <td className="py-4 px-4 font-medium text-foreground">
+                        {formatRecordDate(record.date)}
+                      </td>
+                      <td className="py-4 px-4 text-muted-foreground">
+                        {formatRecordTime(record.checkIn?.time)}
+                      </td>
+                      <td className="py-4 px-4 text-muted-foreground">
+                        {formatRecordTime(record.checkOut?.time)}
+                      </td>
+                      <td className="py-4 px-4 text-center text-warning font-medium">
+                        {record.breaks && record.breaks.length > 0
+                          ? formatDuration(calculateTotalBreakTime(record.breaks))
+                          : '-'}
+                      </td>
+                      <td className="py-4 px-4 text-center font-bold text-foreground">
+                        {calculateRecordWorkHours(record)}
+                      </td>
+                      <td className="py-4 px-4 text-center">
+                        {getStatusBadge(record)}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile View */}
+          <div className="md:hidden space-y-4">
+            {punchHistory.length === 0 ? (
+              <div className="py-8 text-center text-muted-foreground">
+                No attendance records found for this month
+              </div>
+            ) : (
+              punchHistory.map((record) => (
+                <div key={record._id} className="p-4 rounded-xl border border-border space-y-3 bg-card hover:shadow-sm transition-shadow">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-primary" />
+                      <span className="font-semibold text-foreground">{formatRecordDate(record.date)}</span>
+                    </div>
+                    {getStatusBadge(record)}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground uppercase font-medium">Clock In/Out</p>
+                      <div className="flex items-center gap-2">
+                        <span className="text-success">{formatRecordTime(record.checkIn?.time)}</span>
+                        <ArrowRight className="w-3 h-3 text-muted-foreground" />
+                        <span className="text-destructive">{formatRecordTime(record.checkOut?.time)}</span>
+                      </div>
+                    </div>
+                    <div className="space-y-1 text-right">
+                      <p className="text-xs text-muted-foreground uppercase font-medium">Work Hours</p>
+                      <p className="font-bold text-foreground">{calculateRecordWorkHours(record)}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground uppercase font-medium">Break Time</p>
+                      <p className="text-warning font-medium">
+                        {record.breaks && record.breaks.length > 0
+                          ? formatDuration(calculateTotalBreakTime(record.breaks))
+                          : '-'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
     </div>
